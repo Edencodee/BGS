@@ -1,0 +1,289 @@
+/*!
+    \file    change log.txt
+    \brief   change log for GD32C2x1 firmware
+
+    \version 2025-08-08, V1.1.0, firmware for gd32c2x1
+*/
+
+/*
+    Copyright (c) 2025, GigaDevice Semiconductor Inc.
+
+    Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    1. Redistributions of source code must retain the above copyright notice, this 
+       list of conditions and the following disclaimer.
+    2. Redistributions in binary form must reproduce the above copyright notice, 
+       this list of conditions and the following disclaimer in the documentation 
+       and/or other materials provided with the distribution.
+    3. Neither the name of the copyright holder nor the names of its contributors 
+       may be used to endorse or promote products derived from this software without 
+       specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT 
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, 
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY 
+OF SUCH DAMAGE.
+*/
+
+********************************** V1.1.0 2025-08-08*****************************************************
+---------------------------------------Common-----------------------------------------------------------
+Fix file:
+V1.0.0:
+First release
+--------------------------------------------------Timer----------------------------------------------
+Fix file:
+../GD32C2x1_Firmware_Library/Firmware/GD32C2x1_standard_peripheral/Source/gd32c2x1_timer.c
+fix reason:
+1. bug fix for void timer_dma_transfer_config(uint32_t timer_periph, uint32_t dma_baseaddr, uint32_t dma_lenth) and void timer_dma_enable(uint32_t timer_periph, uint16_t dma) function
+V1.0.0:
+void timer_dma_transfer_config(uint32_t timer_periph, uint32_t dma_baseaddr, uint32_t dma_lenth)
+{
+    uint32_t ctl;
+    ctl = TIMER_DMACFG(timer_periph);
+    ctl &= (~(uint32_t)(TIMER_DMACFG_DMATA | TIMER_DMACFG_DMATC));
+    ctl |= (uint32_t)((uint32_t)(dma_baseaddr & timer_periph) | (dma_lenth & TIMER_DMACFG_DMATC));
+    TIMER_DMACFG(timer_periph) = ctl;
+}
+
+void timer_dma_enable(uint32_t timer_periph, uint16_t dma)
+{
+    TIMER_DMAINTEN(timer_periph) |= ((uint32_t) dma & 0X7FU);
+}
+
+V1.1.0:
+void timer_dma_transfer_config(uint32_t timer_periph, uint32_t dma_baseaddr, uint32_t dma_lenth)
+{
+    uint32_t ctl;
+    ctl = TIMER_DMACFG(timer_periph);
+    ctl &= (~(uint32_t)(TIMER_DMACFG_DMATA | TIMER_DMACFG_DMATC));
+    ctl |= (uint32_t)((uint32_t)(dma_baseaddr & TIMER_DMACFG_DMATA) | (dma_lenth & TIMER_DMACFG_DMATC));
+    TIMER_DMACFG(timer_periph) = ctl;
+}
+
+void timer_dma_enable(uint32_t timer_periph, uint16_t dma)
+{
+    TIMER_DMAINTEN(timer_periph) |= ((uint32_t) dma & 0X5F00U);
+}
+------------------------------------------------------------------------------------------------------------
+--------------------------------------------------FMC----------------------------------------------
+Fix file:
+../GD32C2x1_Firmware_Library/Firmware/GD32C2x1_standard_peripheral/Source/gd32c2x1_fmc.c
+fix reason:
+1. bug fix for void fmc_wscnt_set(uint32_t wscnt) function
+2. bug fix for fmc_state_enum ob_dcrp_area_config(uint32_t dcrp_area, uint32_t dcrp_eren, uint32_t dcrp_start,
+                                   uint32_t dcrp_end) function
+V1.0.0:
+void fmc_wscnt_set(uint32_t wscnt)
+{
+#ifdef FW_DEBUG_ERR_REPORT
+    if(NOT_FMC_WAIT_STATE(wscnt)) {
+        fw_debug_report_err(FMC_MODULE_ID, API_ID(0x0005U), ERR_PARAM_OUT_OF_RANGE);
+    } else
+#endif /* FW_DEBUG_ERR_REPORT */
+    {
+        /* set the wait state counter value */
+        FMC_WS &= ~FMC_WS_WSCNT;
+        FMC_WS |=  wscnt & FMC_WS_WSCNT;
+    }
+}
+---------------------------------------------------
+{
+	/* configure EREN */
+	reg_value = FMC_DCRP_EADDR0;
+	reg_value &= ~FMC_DCRP_EADDR0_DCRP_EREN;
+	reg_value |= dcrp_eren << DCRP_EREN_OFFSET;
+	FMC_DCRP_EADDR0 = reg_value;
+}
+---------------------------------------------------
+
+V1.1.0:
+void fmc_wscnt_set(uint32_t wscnt)
+{
+    uint32_t reg = 0U;
+#ifdef FW_DEBUG_ERR_REPORT
+    if(NOT_FMC_WAIT_STATE(wscnt)) {
+        fw_debug_report_err(FMC_MODULE_ID, API_ID(0x0005U), ERR_PARAM_OUT_OF_RANGE);
+    } else
+#endif /* FW_DEBUG_ERR_REPORT */
+    {
+        /* set the wait state counter value */
+        reg = FMC_WS;
+        reg &= ~FMC_WS_WSCNT;
+        reg |= wscnt & FMC_WS_WSCNT;
+        FMC_WS = reg;
+    }
+}
+---------------------------------------------------
+{
+	/* configure EREN */
+	reg_value = FMC_DCRP_EADDR0;
+	reg_value &= ~FMC_DCRP_EADDR0_DCRP_EREN;
+	reg_value |= dcrp_eren;
+	FMC_DCRP_EADDR0 = reg_value;
+}
+---------------------------------------------------
+
+------------------------------------------------------------------------------------------------------------
+--------------------------------------------------I2C----------------------------------------------
+Fix file:
+../GD32C2x1_Firmware_Library/Firmware/GD32C2x1_standard_peripheral/Include/gd32c2x1_i2c.h
+../GD32C2x1_Firmware_Library/Firmware/GD32C2x1_standard_peripheral/Source/gd32c2x1_i2c.c
+/fw32305/GD32C2x1_Firmware_Library/Examples/I2C/Master_transmitter/main.c
+/fw32305/GD32C2x1_Firmware_Library/Examples/I2C/Slave_receiver/main.c
+fix reason:
+1. delete void i2c_nack_disable(uint32_t i2c_periph) function
+2. I2C communication has added a 10-bit function
+V1.0.0:
+*/
+void i2c_nack_disable(uint32_t i2c_periph)
+{
+    I2C_CTL1(i2c_periph) &= ~I2C_CTL1_NACKEN;
+}
+
+V1.1.0:
+None
+------------------------------------------------------------------------------------------------------------
+--------------------------------------------------USART----------------------------------------------
+Fix file:
+../GD32C2x1_Firmware_Library/Firmware/GD32C2x1_standard_peripheral/Source/gd32c2x1_usart.c
+../GD32C2x1_Firmware_Library/Firmware/GD32C2x1_standard_peripheral/Include/gd32c2x1_usart.h
+fix reason:
+1. Add the auto baud rate detection function
+V1.0.0:
+None
+
+V1.1.0:
+void usart_autobaud_detection_enable(uint32_t usart_periph)
+{
+    USART_CTL1(usart_periph) |= USART_CTL1_ABDEN;
+}
+
+/*!
+    \brief      disable auto baud rate detection (API_ID: 0x0017U)
+    \param[in]  usart_periph: USARTx(x=0)
+    \param[out] none
+    \retval     none
+*/
+void usart_autobaud_detection_disable(uint32_t usart_periph)
+{
+    USART_CTL1(usart_periph) &= ~(USART_CTL1_ABDEN);
+}
+
+/*!
+    \brief      configure auto baud rate detection mode (API_ID: 0x0018U)
+    \param[in]  usart_periph: USARTx(x=0)
+    \param[in]  abdmod: auto baud rate detection mode
+                only one parameter can be selected which is shown as below:
+      \arg        USART_ABDM_FTOR: falling edge to rising edge measurement
+      \arg        USART_ABDM_FTOF: falling edge to falling edge measurement
+    \param[out] none
+    \retval     none
+*/
+void usart_autobaud_detection_mode_config(uint32_t usart_periph, uint32_t abdmod)
+{
+    /* reset ABDM bits */
+    USART_CTL1(usart_periph) &= ~(USART_CTL1_ABDM);
+    USART_CTL1(usart_periph) |= abdmod & USART_CTL1_ABDM;
+}
+------------------------------------------------------------------------------------------------------------
+--------------------------------------------------spi----------------------------------------------
+Fix file:
+../GD32C2x1_Firmware_Library/Firmware/GD32C2x1_standard_peripheral/Source/gd32c2x1_spi.c
+../GD32C2x1_Firmware_Library/Firmware/GD32C2x1_standard_peripheral/Include/gd32c2x1_spi.h
+fix reason:
+1. Bug fix for FlagStatus spi_i2s_flag_get(uint32_t spi_periph, uint32_t flag) function
+V1.0.0:
+FlagStatus spi_i2s_flag_get(uint32_t spi_periph, uint32_t flag)
+{
+    FlagStatus reval = RESET;
+
+    if(0U != (SPI_STAT(spi_periph) & flag)) {
+        reval = SET;
+    } else {
+        if(SPI1 == spi_periph) {
+            /* check TXFIFO is empty or not */
+            if(SPI_TXLVL_EMPTY == flag) {
+                if(0U != (SPI_STAT(spi_periph) & SPI_TXLVL_EMPTY_MASK)) {
+                    reval = RESET;
+                } else {
+                    reval = SET;
+                }
+            }
+            /* check RXFIFO is empty or not */
+            if(SPI_RXLVL_EMPTY == flag) {
+                if(0U != (SPI_STAT(spi_periph) & SPI_RXLVL_EMPTY_MASK)) {
+                    reval = RESET;
+                } else {
+                    reval = SET;
+                }
+            }
+        }
+    }
+
+    return reval;
+}
+
+V1.1.0:
+FlagStatus spi_i2s_flag_get(uint32_t spi_periph, uint32_t flag)
+{
+    FlagStatus reval = RESET;
+    uint32_t reg = SPI_STAT(spi_periph);
+
+    switch(flag) {
+#if defined(GD32C231) || defined(GD32C221)
+    case SPI_FLAG_TXLVL_EMPTY:
+        if(0U == (reg & SPI_TXLVL_MASK)) {
+            reval = SET;
+        }
+        break;
+    case SPI_FLAG_TXLVL_QUARTER_FULL:
+    case SPI_FLAG_TXLVL_HALF_FULL:
+    case SPI_FLAG_TXLVL_FULL:
+        if(flag == (reg & SPI_TXLVL_MASK)) {
+            reval = SET;
+        }
+        break;
+    case SPI_FLAG_RXLVL_EMPTY:
+        if(0U == (reg & SPI_RXLVL_MASK)) {
+            reval = SET;
+        }
+        break;
+    case SPI_FLAG_RXLVL_QUARTER_FULL:
+    case SPI_FLAG_RXLVL_HALF_FULL:
+    case SPI_FLAG_RXLVL_FULL:
+        if(flag == (reg & SPI_RXLVL_MASK)) {
+            reval = SET;
+        }
+        break;
+#endif
+    default:
+        if(0U != (reg & flag)) {
+            reval = SET;
+        }
+        break;
+    }
+
+    return reval;
+}
+------------------------------------------------------------------------------------------------------------
+--------------------------------------------------RTC----------------------------------------------
+Fix file:
+../GD32C2x1_Firmware_Library/Examples/RTC/Calendar_alarm/main.c
+fix reason:
+1. Bug fix for Calendar_alarm example
+V1.0.0:
+None
+
+V1.1.0:
+if(RESET != (RCU_CTL1 & RCU_CTL1_BKPRST)) {
+    rcu_bkp_reset_disable();
+}
+------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------
