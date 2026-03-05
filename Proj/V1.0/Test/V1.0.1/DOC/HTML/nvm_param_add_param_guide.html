@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NVM 新增参数操作指南（精简版）</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff;
+      --fg: #1f2328;
+      --muted: #6b7280;
+      --card: #f6f8fa;
+      --accent: #2563eb;
+      --border: #e5e7eb;
+      --code-bg: #0b1021;
+      --code-fg: #e5e7eb;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC",
+                   "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.7;
+    }
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 32px 20px 80px;
+    }
+    h1 {
+      font-size: 28px;
+      margin: 0 0 16px;
+    }
+    h2 {
+      font-size: 20px;
+      margin: 28px 0 12px;
+      border-left: 4px solid var(--accent);
+      padding-left: 10px;
+    }
+    h3 {
+      font-size: 16px;
+      margin: 18px 0 8px;
+      color: var(--accent);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin: 12px 0;
+    }
+    ul { padding-left: 20px; }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    pre {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      padding: 12px 14px;
+      border-radius: 8px;
+      overflow: auto;
+    }
+    .muted { color: var(--muted); }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      font-size: 12px;
+      margin-left: 6px;
+    }
+    .checklist li { margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>NVM 新增参数操作指南（精简版）</h1>
+    <p class="muted">适用于当前工程的 nvm_param_simple 方案（A/B 双页、整结构体存储、CRC32 校验）。</p>
+
+    <h2>一、修改结构体</h2>
+    <h3>1. 在 sensor_param_t 中新增字段</h3>
+    <div class="card">
+      位置：BSP/inc/nvm_param_simple.h<br>
+      示例：新增 <code>uint8_t mode_ext;</code>
+    </div>
+
+    <h3>2. 重新计算结构体大小</h3>
+    <ul>
+      <li>sensor_param_t 为 packed：字段大小直接相加</li>
+      <li>记录长度公式：<code>record_size = 4(magic) + 4(seq) + sizeof(sensor_param_t) + 4(crc32) + padding</code></li>
+      <li>目标：record_size 必须是 <strong>8 字节倍数</strong></li>
+    </ul>
+
+    <h3>3. 调整 padding 大小</h3>
+    <div class="card">
+      计算：<code>padding = (8 - (record_size % 8)) % 8</code>
+      <br>并同步更新注释。
+    </div>
+
+    <h2>二、更新默认值</h2>
+    <div class="card">
+      位置：BSP/src/nvm_param_simple.c<br>
+      为新增字段设置合理默认值。
+    </div>
+
+    <h2>三、CRC 覆盖范围（关键）</h2>
+    <ul>
+      <li>CRC 只覆盖：<strong>magic + seq + param</strong></li>
+      <li>不包含 crc32 字段，不包含 padding</li>
+    </ul>
+    <div class="card">
+      建议使用固定长度常量：
+      <pre>#define NVM_CRC_DATA_LEN  (sizeof(uint32_t) + sizeof(uint32_t) + sizeof(sensor_param_t))</pre>
+    </div>
+
+    <h2>四、兼容旧数据（可选但建议）</h2>
+    <h3>方式一：增加版本号字段</h3>
+    <ul>
+      <li>新增 <code>uint8_t version;</code></li>
+      <li>读取旧数据时按 version 进行兼容填充</li>
+    </ul>
+
+    <h3>方式二：升级 MAGIC</h3>
+    <ul>
+      <li>修改 <code>NVM_MAGIC</code>（例如 0x5A5AA55B）</li>
+      <li>强制重新初始化默认值</li>
+    </ul>
+
+    <h2>五、测试步骤</h2>
+    <ol>
+      <li>确认 sizeof(sensor_param_t) 变化</li>
+      <li>确认 sizeof(nvm_record_t) 为 8 字节倍数</li>
+      <li>运行最小读写测试</li>
+      <li>断电重启验证持久化</li>
+    </ol>
+
+    <h2>六、快速检查清单</h2>
+    <ul class="checklist">
+      <li>新增字段已加入 sensor_param_t</li>
+      <li>padding 已重新计算</li>
+      <li>FACTORY_DEFAULT 已补齐</li>
+      <li>NVM_CRC_DATA_LEN 不包含 padding/crc32</li>
+      <li>最小用例通过</li>
+    </ul>
+
+    <h2>示例（新增 1 字节字段）</h2>
+    <pre>// sensor_param_t 增加字段
+uint8_t  mode_ext;
+
+// 重新计算 record_size
+// 4 + 4 + (原param_size + 1) + 4 + padding
+
+// 调整 padding 为新的值
+uint8_t  padding[新的长度];</pre>
+
+    <p class="muted">如需我根据你当前字段直接算出 padding 和默认值修改，请告诉我新增字段的类型和数量。</p>
+  </div>
+</body>
+</html>

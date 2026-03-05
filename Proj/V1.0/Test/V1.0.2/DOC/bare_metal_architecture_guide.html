@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>裸机系统架构设计指南 | Super Loop + Event Flags</title>
+    
+    <!-- Mermaid for diagrams -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    
+    <!-- Highlight.js for code highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <style>
+        /* ==================== Apple-inspired Design System ==================== */
+        
+        :root {
+            /* Apple Color Palette */
+            --color-primary: #007AFF;
+            --color-secondary: #5856D6;
+            --color-success: #34C759;
+            --color-warning: #FF9500;
+            --color-danger: #FF3B30;
+            
+            /* Neutral Colors */
+            --color-bg: #FFFFFF;
+            --color-bg-secondary: #F5F5F7;
+            --color-bg-tertiary: #E8E8ED;
+            --color-surface: #FFFFFF;
+            --color-text: #1D1D1F;
+            --color-text-secondary: #6E6E73;
+            --color-text-tertiary: #86868B;
+            --color-border: #D2D2D7;
+            --color-divider: #E5E5EA;
+            
+            /* Code Colors */
+            --color-code-bg: #F6F8FA;
+            --color-code-border: #E1E4E8;
+            
+            /* Shadows */
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.12);
+            
+            /* Spacing */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 32px;
+            --space-2xl: 48px;
+            --space-3xl: 64px;
+            
+            /* Border Radius */
+            --radius-sm: 6px;
+            --radius-md: 12px;
+            --radius-lg: 18px;
+            --radius-xl: 24px;
+            
+            /* Typography */
+            --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", 
+                           "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            --font-mono: "SF Mono", Monaco, "Cascadia Code", "Courier New", monospace;
+        }
+        
+        /* ==================== Global Styles ==================== */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 80px;
+        }
+        
+        body {
+            font-family: var(--font-system);
+            font-size: 17px;
+            line-height: 1.6;
+            color: var(--color-text);
+            background: var(--color-bg-secondary);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* ==================== Header ==================== */
+        
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid var(--color-divider);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            padding: 0 var(--space-xl);
+        }
+        
+        .header-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--color-text);
+            letter-spacing: -0.02em;
+        }
+        
+        .header-nav {
+            margin-left: auto;
+            display: flex;
+            gap: var(--space-lg);
+        }
+        
+        .header-nav a {
+            color: var(--color-text-secondary);
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+        
+        .header-nav a:hover {
+            color: var(--color-primary);
+        }
+        
+        /* ==================== Container ==================== */
+        
+        .container {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 96px var(--space-xl) var(--space-3xl);
+        }
+        
+        /* ==================== Hero Section ==================== */
+        
+        .hero {
+            text-align: center;
+            padding: var(--space-3xl) 0;
+            margin-bottom: var(--space-3xl);
+        }
+        
+        .hero-title {
+            font-size: 56px;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            color: var(--color-text);
+            margin-bottom: var(--space-md);
+            line-height: 1.1;
+        }
+        
+        .hero-subtitle {
+            font-size: 24px;
+            font-weight: 400;
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-xl);
+        }
+        
+        .hero-meta {
+            display: flex;
+            justify-content: center;
+            gap: var(--space-lg);
+            flex-wrap: wrap;
+        }
+        
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-sm) var(--space-md);
+            background: var(--color-bg);
+            border-radius: var(--radius-md);
+            font-size: 14px;
+            color: var(--color-text-secondary);
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .meta-icon {
+            font-size: 18px;
+        }
+        
+        /* ==================== Card System ==================== */
+        
+        .card {
+            background: var(--color-surface);
+            border-radius: var(--radius-lg);
+            padding: var(--space-xl);
+            margin-bottom: var(--space-xl);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--color-border);
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+        
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            margin-bottom: var(--space-lg);
+        }
+        
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+        
+        .card-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--color-text);
+            letter-spacing: -0.02em;
+        }
+        
+        /* ==================== Typography ==================== */
+        
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--color-text);
+            margin-top: var(--space-xl);
+            margin-bottom: var(--space-md);
+            line-height: 1.2;
+        }
+        
+        h1 { font-size: 48px; }
+        h2 { font-size: 36px; }
+        h3 { font-size: 28px; }
+        h4 { font-size: 22px; }
+        h5 { font-size: 19px; }
+        h6 { font-size: 17px; }
+        
+        p {
+            margin-bottom: var(--space-md);
+            color: var(--color-text-secondary);
+        }
+        
+        a {
+            color: var(--color-primary);
+            text-decoration: none;
+            transition: opacity 0.2s ease;
+        }
+        
+        a:hover {
+            opacity: 0.7;
+        }
+        
+        strong {
+            font-weight: 600;
+            color: var(--color-text);
+        }
+        
+        /* ==================== Lists ==================== */
+        
+        ul, ol {
+            margin-bottom: var(--space-md);
+            padding-left: var(--space-xl);
+        }
+        
+        li {
+            margin-bottom: var(--space-sm);
+            color: var(--color-text-secondary);
+        }
+        
+        /* ==================== Code Blocks ==================== */
+        
+        code {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            padding: 2px 6px;
+            background: var(--color-code-bg);
+            border: 1px solid var(--color-code-border);
+            border-radius: var(--radius-sm);
+            color: var(--color-text);
+        }
+        
+        pre {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
+            overflow-x: auto;
+            margin-bottom: var(--space-lg);
+            box-shadow: var(--shadow-sm);
+        }
+        
+        pre code {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        /* ==================== Tables ==================== */
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: var(--space-lg);
+            background: var(--color-surface);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        thead {
+            background: var(--color-bg-secondary);
+        }
+        
+        th {
+            padding: var(--space-md);
+            text-align: left;
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--color-text);
+            border-bottom: 2px solid var(--color-divider);
+        }
+        
+        td {
+            padding: var(--space-md);
+            color: var(--color-text-secondary);
+            border-bottom: 1px solid var(--color-divider);
+            font-size: 15px;
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        tr:hover {
+            background: var(--color-bg-secondary);
+        }
+        
+        /* ==================== Badges ==================== */
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-right: var(--space-sm);
+            margin-bottom: var(--space-sm);
+        }
+        
+        .badge-primary {
+            background: rgba(0, 122, 255, 0.1);
+            color: var(--color-primary);
+        }
+        
+        .badge-success {
+            background: rgba(52, 199, 89, 0.1);
+            color: var(--color-success);
+        }
+        
+        .badge-warning {
+            background: rgba(255, 149, 0, 0.1);
+            color: var(--color-warning);
+        }
+        
+        .badge-danger {
+            background: rgba(255, 59, 48, 0.1);
+            color: var(--color-danger);
+        }
+        
+        /* ==================== Callout Boxes ==================== */
+        
+        .callout {
+            padding: var(--space-lg);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-lg);
+            border-left: 4px solid;
+        }
+        
+        .callout-info {
+            background: rgba(0, 122, 255, 0.05);
+            border-color: var(--color-primary);
+        }
+        
+        .callout-success {
+            background: rgba(52, 199, 89, 0.05);
+            border-color: var(--color-success);
+        }
+        
+        .callout-warning {
+            background: rgba(255, 149, 0, 0.05);
+            border-color: var(--color-warning);
+        }
+        
+        .callout-danger {
+            background: rgba(255, 59, 48, 0.05);
+            border-color: var(--color-danger);
+        }
+        
+        .callout-title {
+            font-weight: 600;
+            margin-bottom: var(--space-sm);
+            font-size: 16px;
+        }
+        
+        /* ==================== Diagram Container ==================== */
+        
+        .diagram-container {
+            background: var(--color-surface);
+            border-radius: var(--radius-md);
+            padding: var(--space-xl);
+            margin: var(--space-lg) 0;
+            box-shadow: var(--shadow-sm);
+            overflow-x: auto;
+        }
+        
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+        
+        /* ==================== Comparison Grid ==================== */
+        
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--space-lg);
+            margin: var(--space-lg) 0;
+        }
+        
+        .comparison-item {
+            background: var(--color-surface);
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
+            box-shadow: var(--shadow-sm);
+            border: 2px solid var(--color-border);
+            transition: all 0.3s ease;
+        }
+        
+        .comparison-item:hover {
+            border-color: var(--color-primary);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .comparison-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: var(--space-md);
+            color: var(--color-text);
+        }
+        
+        /* ==================== Feature List ==================== */
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .feature-list li {
+            padding: var(--space-sm) 0;
+            padding-left: var(--space-xl);
+            position: relative;
+        }
+        
+        .feature-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--color-success);
+            font-weight: 700;
+            font-size: 18px;
+        }
+        
+        .feature-list.cons li::before {
+            content: "✗";
+            color: var(--color-danger);
+        }
+        
+        /* ==================== Footer ==================== */
+        
+        .footer {
+            margin-top: var(--space-3xl);
+            padding: var(--space-xl) 0;
+            border-top: 1px solid var(--color-divider);
+            text-align: center;
+            color: var(--color-text-tertiary);
+            font-size: 14px;
+        }
+        
+        /* ==================== Responsive Design ==================== */
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 80px var(--space-md) var(--space-xl);
+            }
+            
+            .hero-title {
+                font-size: 36px;
+            }
+            
+            .hero-subtitle {
+                font-size: 18px;
+            }
+            
+            .card {
+                padding: var(--space-lg);
+            }
+            
+            .card-title {
+                font-size: 22px;
+            }
+            
+            .header-nav {
+                display: none;
+            }
+            
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            table {
+                font-size: 13px;
+            }
+            
+            th, td {
+                padding: var(--space-sm);
+            }
+        }
+        
+        /* ==================== Scrollbar ==================== */
+        
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--color-bg-secondary);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-border);
+            border-radius: 5px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--color-text-tertiary);
+        }
+        
+        /* ==================== Animation ==================== */
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .card {
+            animation: fadeIn 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-title">裸机系统架构指南</div>
+        <nav class="header-nav">
+            <a href="#architecture">架构</a>
+            <a href="#features">特点</a>
+            <a href="#comparison">对比</a>
+            <a href="#optimization">优化</a>
+        </nav>
+    </header>
+    
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1 class="hero-title">裸机系统架构设计指南</h1>
+            <p class="hero-subtitle">Super Loop + Event Flags 模式深度解析</p>
+            <div class="hero-meta">
+                <div class="meta-item">
+                    <span class="meta-icon">📦</span>
+                    <span>GD32C231</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-icon">🏗️</span>
+                    <span>Bare-Metal</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-icon">📅</span>
+                    <span>2026-03-05</span>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Architecture Overview Card -->
+        <div class="card" id="architecture">
+            <div class="card-header">
+                <div class="card-icon">🎯</div>
+                <h2 class="card-title">架构识别与分类</h2>
+            </div>
+            
+            <p>本项目采用典型的<strong>裸机系统（Bare-Metal）</strong>架构，使用经典的<strong>前后台系统</strong>设计模式。</p>
+            
+            <div class="callout callout-info">
+                <div class="callout-title">💡 核心设计理念</div>
+                <p>中断服务程序（ISR）快速设置事件标志位，主循环（Super Loop）轮询检查标志并执行具体业务逻辑，实现前后台分离。</p>
+            </div>
+            
+            <h3>系统架构图</h3>
+            <div class="diagram-container">
+                <div class="mermaid">
+graph TB
+    subgraph Backend["后台：中断服务程序 (ISR)"]
+        ISR1["SysTick_Handler()"]
+        ISR2["EXTI5_9_IRQHandler()"]
+        ISR3["DMA_Channel0_IRQHandler()"]
+    end
+    
+    subgraph Flags["事件标志位"]
+        F1["g_isSysTickInt"]
+        F2["g_isStartSampling"]
+        F3["g_isA_Done / g_isB_Done"]
+    end
+    
+    subgraph Frontend["前台：主循环 (Super Loop)"]
+        ML["while(1)"]
+        T1["SysTickTask()"]
+        T2["MeasureTask()"]
+        T3["AnalyzeTask()"]
+    end
+    
+    ISR1 -->|"设置标志"| F1
+    ISR2 -->|"设置标志"| F2
+    ISR3 -->|"设置标志"| F3
+    
+    F1 -->|"检查标志"| ML
+    F2 -->|"检查标志"| ML
+    F3 -->|"检查标志"| ML
+    
+    ML --> T1
+    ML --> T2
+    ML --> T3
+    
+    style Backend fill:#e3f2fd
+    style Flags fill:#fff3e0
+    style Frontend fill:#f3e5f5
+                </div>
+            </div>
+            
+            <h3>分类特征</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>特征</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>类型</strong></td>
+                        <td>前后台系统 (Foreground/Background)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>调度方式</strong></td>
+                        <td>轮询式 (Polling)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>任务模型</strong></td>
+                        <td>超级循环 (Super Loop)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>事件机制</strong></td>
+                        <td>标志位驱动 (Event Flags)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>实时性</strong></td>
+                        <td>软实时 (Soft Real-Time)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>复杂度</strong></td>
+                        <td>低到中等</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Event Flags Card -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon">🚦</div>
+                <h2 class="card-title">标志位与状态机</h2>
+            </div>
+            
+            <h3>标志位类型分析</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>类型</th>
+                        <th>标志位</th>
+                        <th>特点</th>
+                        <th>用途</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="badge badge-primary">事件标志</span></td>
+                        <td><code>g_isStartSampling</code></td>
+                        <td>单次触发</td>
+                        <td>响应外部事件</td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge badge-success">周期标志</span></td>
+                        <td><code>g_isSysTickInt</code></td>
+                        <td>周期触发</td>
+                        <td>定时任务调度</td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge badge-warning">同步标志</span></td>
+                        <td><code>g_isA_Done</code>, <code>g_isB_Done</code></td>
+                        <td>多条件组合</td>
+                        <td>任务同步屏障</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="callout callout-warning">
+                <div class="callout-title">⚠️ 标志位 vs 状态机</div>
+                <p>这些标志位<strong>不是完整的状态机</strong>，而是<strong>事件驱动标志</strong>。标志位无状态保持、转换隐式、不可追溯；而状态机有明确的状态记录、显式转换条件和历史可追溯性。</p>
+            </div>
+            
+            <h3>隐式状态转换流程</h3>
+            <div class="diagram-container">
+                <div class="mermaid">
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> WAITING: EXTI触发<br/>g_isStartSampling=true
+    WAITING --> SAMPLING: MeasureTask()<br/>开始采样
+    SAMPLING --> DATA_READY: DMA完成<br/>g_isA_Done && g_isB_Done
+    DATA_READY --> ANALYZING: AnalyzeTask()<br/>数据分析
+    ANALYZING --> OUTPUT: g_isVoutReady=true<br/>输出就绪
+    OUTPUT --> IDLE: OutputTask()<br/>完成输出
+                </div>
+            </div>
+        </div>
+        
+        <!-- Advantages Card -->
+        <div class="card" id="features">
+            <div class="card-header">
+                <div class="card-icon">✅</div>
+                <h2 class="card-title">架构优势</h2>
+            </div>
+            
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <h3 class="comparison-title">🎓 简单性</h3>
+                    <ul class="feature-list">
+                        <li>学习曲线平缓</li>
+                        <li>代码流程线性可预测</li>
+                        <li>调试简单直观</li>
+                        <li>无需理解RTOS概念</li>
+                    </ul>
+                </div>
+                
+                <div class="comparison-item">
+                    <h3 class="comparison-title">⚡ 响应性</h3>
+                    <ul class="feature-list">
+                        <li>ISR快速响应（&lt;1μs）</li>
+                        <li>无上下文切换开销</li>
+                        <li>确定性高</li>
+                        <li>WCET易于计算</li>
+                    </ul>
+                </div>
+                
+                <div class="comparison-item">
+                    <h3 class="comparison-title">💾 资源占用</h3>
+                    <ul class="feature-list">
+                        <li>Flash: ~20KB</li>
+                        <li>RAM: ~2KB</li>
+                        <li>单栈设计</li>
+                        <li>无内核开销</li>
+                    </ul>
+                </div>
+                
+                <div class="comparison-item">
+                    <h3 class="comparison-title">🔧 可维护性</h3>
+                    <ul class="feature-list">
+                        <li>代码体积小</li>
+                        <li>职责分离清晰</li>
+                        <li>中断与任务解耦</li>
+                        <li>易于理解和修改</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <h3>代码示例：快速中断响应</h3>
+            <pre><code class="language-c">/*!
+    \brief  SysTick中断处理
+    \note   只设置标志位，避免长时间占用中断
+*/
+void SysTick_Handler(void)
+{
+    delay_decrement();        // ✅ 快速操作1: 毫秒延迟计数
+    tick_count++;             // ✅ 快速操作2: 时间戳累加
+    g_isSysTickInt = true;    // ✅ 快速操作3: 设置事件标志
+    
+    // ✅ 总耗时 < 1μs，快速返回
+}</code></pre>
+        </div>
+        
+        <!-- Disadvantages Card -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon">⚠️</div>
+                <h2 class="card-title">架构缺陷</h2>
+            </div>
+            
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <h3 class="comparison-title">🔒 优先级固化</h3>
+                    <ul class="feature-list cons">
+                        <li>优先级由if顺序决定</li>
+                        <li>无法动态调整</li>
+                        <li>扩展性差</li>
+                    </ul>
+                </div>
+                
+                <div class="comparison-item">
+                    <h3 class="comparison-title">🚫 任务饥饿</h3>
+                    <ul class="feature-list cons">
+                        <li>长任务阻塞后续</li>
+                        <li>无抢占机制</li>
+                        <li>可能导致超时</li>
+                    </ul>
+                </div>
+                
+                <div class="comparison-item">
+                    <h3 class="comparison-title">📉 时序不稳定</h3>
+                    <ul class="feature-list cons">
+                        <li>循环周期不固定</li>
+                        <li>标志位可能覆盖</li>
+                        <li>事件可能丢失</li>
+                    </ul>
+                </div>
+                
+                <div class="comparison-item">
+                    <h3 class="comparison-title">⛔ 功能限制</h3>
+                    <ul class="feature-list cons">
+                        <li>不支持阻塞等待</li>
+                        <li>同步复杂</li>
+                        <li>竞态风险高</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="callout callout-danger">
+                <div class="callout-title">🚨 关键问题：标志位覆盖</div>
+                <p>如果中断频繁触发，而主循环处理速度较慢，后续触发的事件会被忽略（标志位已经是true）。解决方案：使用计数器代替布尔标志。</p>
+            </div>
+            
+            <pre><code class="language-c">// ❌ 问题代码：标志位可能丢失事件
+void ISR(void) {
+    g_flag = true;  // 如果已经是true，新事件丢失
+}
+
+// ✅ 改进方案：使用计数器
+volatile uint32_t g_eventCount = 0;
+
+void ISR(void) {
+    g_eventCount++;  // 计数不会丢失
+}
+
+void main_loop(void) {
+    if(g_eventCount > 0) {
+        uint32_t count = g_eventCount;
+        g_eventCount = 0;
+        
+        for(uint32_t i = 0; i < count; i++) {
+            ProcessEvent();
+        }
+    }
+}</code></pre>
+        </div>
+        
+        <!-- Comparison with FreeRTOS -->
+        <div class="card" id="comparison">
+            <div class="card-header">
+                <div class="card-icon">🆚</div>
+                <h2 class="card-title">与 FreeRTOS 对比</h2>
+            </div>
+            
+            <h3>核心差异对比</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>维度</th>
+                        <th>Super Loop</th>
+                        <th>FreeRTOS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>调度方式</strong></td>
+                        <td>轮询检查标志位</td>
+                        <td>抢占式/时间片调度</td>
+                    </tr>
+                    <tr>
+                        <td><strong>优先级</strong></td>
+                        <td>固定（编译时）</td>
+                        <td>动态可配置</td>
+                    </tr>
+                    <tr>
+                        <td><strong>上下文切换</strong></td>
+                        <td>无</td>
+                        <td>2-10μs</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RAM占用</strong></td>
+                        <td>~2KB</td>
+                        <td>~8KB</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Flash占用</strong></td>
+                        <td>~20KB</td>
+                        <td>~40KB</td>
+                    </tr>
+                    <tr>
+                        <td><strong>实时性</strong></td>
+                        <td>软实时</td>
+                        <td>硬实时</td>
+                    </tr>
+                    <tr>
+                        <td><strong>学习曲线</strong></td>
+                        <td>平缓（1周）</td>
+                        <td>陡峭（1-2月）</td>
+                    </tr>
+                    <tr>
+                        <td><strong>阻塞支持</strong></td>
+                        <td>不支持</td>
+                        <td>完全支持</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3>响应时间对比图</h3>
+            <div class="diagram-container">
+                <div class="mermaid">
+sequenceDiagram
+    participant LE as 低优先级事件
+    participant SL as Super Loop
+    participant RT as FreeRTOS任务
+    participant HE as 高优先级事件
+    
+    Note over SL: 低优先级任务执行中<br/>(5ms)
+    HE->>SL: 高优先级事件发生
+    Note over SL: 必须等待<br/>当前任务完成
+    Note over SL: 延迟5ms
+    SL->>HE: 开始处理
+    
+    Note over RT: 低优先级任务执行中
+    HE->>RT: 高优先级事件发生
+    Note over RT: 立即抢占<br/>(~10μs)
+    RT->>HE: 立即处理
+    Note over RT: 完成后恢复<br/>低优先级任务
+                </div>
+            </div>
+            
+            <div class="callout callout-success">
+                <div class="callout-title">💡 响应增益</div>
+                <p><strong>Super Loop:</strong> 5ms（最坏情况）<br>
+                <strong>FreeRTOS:</strong> 10μs（典型值）<br>
+                <strong>增益:</strong> 500倍！</p>
+            </div>
+        </div>
+        
+        <!-- Optimization Guide -->
+        <div class="card" id="optimization">
+            <div class="card-header">
+                <div class="card-icon">🚀</div>
+                <h2 class="card-title">优化建议</h2>
+            </div>
+            
+            <h3>短期优化（立即可行）</h3>
+            
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <h4>1️⃣ 防止标志位丢失</h4>
+                    <p>使用计数器代替布尔标志，避免高频事件丢失。</p>
+                </div>
+                
+                <div class="comparison-item">
+                    <h4>2️⃣ 任务超时检测</h4>
+                    <p>监控每个任务的执行时间，发现异常及时告警。</p>
+                </div>
+                
+                <div class="comparison-item">
+                    <h4>3️⃣ 看门狗保护</h4>
+                    <p>防止主循环卡死，添加硬件/软件看门狗。</p>
+                </div>
+                
+                <div class="comparison-item">
+                    <h4>4️⃣ 优化处理顺序</h4>
+                    <p>按任务紧急程度调整if语句检查顺序。</p>
+                </div>
+            </div>
+            
+            <h3>中期优化（需要重构）</h3>
+            <pre><code class="language-c">// 引入简单调度表
+typedef struct {
+    TaskFunc func;
+    volatile bool *flag;
+    uint32_t priority;
+    uint32_t budget_us;
+} TaskEntry_t;
+
+const TaskEntry_t g_taskTable[] = {
+    {SysTickTask,   &g_isSysTickInt,     1, 50},
+    {MeasureTask,   &g_isStartSampling,  2, 200},
+    {AnalyzeTask,   &g_isAnalyzeReady,   3, 500},
+    {OutputTask,    &g_isVoutReady,      4, 100},
+};
+
+void Scheduler_Run(void)
+{
+    // 按优先级顺序检查
+    for(int i = 0; i < ARRAY_SIZE(g_taskTable); i++) {
+        if(*g_taskTable[i].flag) {
+            *g_taskTable[i].flag = false;
+            Task_Execute(g_taskTable[i].func, i);
+        }
+    }
+}</code></pre>
+            
+            <h3>长期优化（架构升级）</h3>
+            <ul>
+                <li>迁移到轻量级协作式内核</li>
+                <li>选择性引入FreeRTOS特性</li>
+                <li>混合架构：关键任务用RTOS，简单任务保持Super Loop</li>
+            </ul>
+        </div>
+        
+        <!-- Use Cases -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon">✨</div>
+                <h2 class="card-title">适用场景</h2>
+            </div>
+            
+            <h3>✅ Super Loop 最适合</h3>
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <h4>简单控制系统</h4>
+                    <ul>
+                        <li>传感器数据采集</li>
+                        <li>电机PWM控制</li>
+                        <li>简单开关逻辑</li>
+                    </ul>
+                </div>
+                
+                <div class="comparison-item">
+                    <h4>资源受限设备</h4>
+                    <ul>
+                        <li>Flash &lt; 32KB</li>
+                        <li>RAM &lt; 4KB</li>
+                        <li>低功耗要求</li>
+                    </ul>
+                </div>
+                
+                <div class="comparison-item">
+                    <h4>快速原型开发</h4>
+                    <ul>
+                        <li>验证概念</li>
+                        <li>功能演示</li>
+                        <li>学习阶段</li>
+                    </ul>
+                </div>
+                
+                <div class="comparison-item">
+                    <h4>明确的任务结构</h4>
+                    <ul>
+                        <li>任务数量 &lt; 10</li>
+                        <li>依赖关系简单</li>
+                        <li>周期性任务为主</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <h3>⚠️ 应该升级到 RTOS</h3>
+            <div class="callout callout-warning">
+                <div class="callout-title">以下情况建议使用 FreeRTOS：</div>
+                <ul>
+                    <li>任务数量 > 10个</li>
+                    <li>硬实时要求（响应 &lt; 1ms）</li>
+                    <li>需要阻塞操作（网络、文件系统）</li>
+                    <li>复杂的任务间通信</li>
+                    <li>长期维护的商业项目</li>
+                </ul>
+            </div>
+            
+            <h3>本项目评估</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>评估项</th>
+                        <th>当前状态</th>
+                        <th>结论</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>任务数量</td>
+                        <td>5-7个</td>
+                        <td><span class="badge badge-success">✓ 合适</span></td>
+                    </tr>
+                    <tr>
+                        <td>实时性</td>
+                        <td>5ms响应</td>
+                        <td><span class="badge badge-success">✓ 可满足</span></td>
+                    </tr>
+                    <tr>
+                        <td>资源</td>
+                        <td>Flash 128KB, RAM 20KB</td>
+                        <td><span class="badge badge-success">✓ 充足</span></td>
+                    </tr>
+                    <tr>
+                        <td>复杂度</td>
+                        <td>DMA + EXTI + SysTick</td>
+                        <td><span class="badge badge-warning">⚠️ 略复杂</span></td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="callout callout-info">
+                <div class="callout-title">📊 结论</div>
+                <p>当前 Super Loop 架构<strong>基本合适</strong>，建议：</p>
+                <ul>
+                    <li><strong>短期：</strong>优化标志位处理（防丢失）</li>
+                    <li><strong>中期：</strong>引入简单调度表（提高可维护性）</li>
+                    <li><strong>长期：</strong>如功能扩展（如加入通信、UI），考虑 FreeRTOS</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Reference -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon">📚</div>
+                <h2 class="card-title">参考资源</h2>
+            </div>
+            
+            <h3>相关文档</h3>
+            <ul>
+                <li><a href="app_architecture_tasks.md">app_architecture_tasks.md</a> - 应用层框架设计</li>
+                <li><a href="DEBUG_GUIDE.md">DEBUG_GUIDE.md</a> - 调试指南</li>
+                <li><a href="QUICK_START_timing_measurement.md">QUICK_START_timing_measurement.md</a> - 时序测量</li>
+            </ul>
+            
+            <h3>扩展阅读</h3>
+            <div class="comparison-grid">
+                <div class="comparison-item">
+                    <h4>📖 推荐书籍</h4>
+                    <ul>
+                        <li>《嵌入式实时操作系统μC/OS-II》</li>
+                        <li>《FreeRTOS官方指南》</li>
+                        <li>《嵌入式系统设计模式》</li>
+                    </ul>
+                </div>
+                
+                <div class="comparison-item">
+                    <h4>🌐 在线资源</h4>
+                    <ul>
+                        <li><a href="https://www.freertos.org/" target="_blank">FreeRTOS官网</a></li>
+                        <li>ARM Cortex-M中断优先级文档</li>
+                        <li>GD32C231参考手册</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="footer">
+        <p>裸机系统架构设计指南 v1.0 | 2026-03-05 | GD32C231 项目</p>
+        <p>如有疑问或建议，请参考项目文档或联系开发团队</p>
+    </footer>
+    
+    <!-- Scripts -->
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#007AFF',
+                primaryTextColor: '#1D1D1F',
+                primaryBorderColor: '#007AFF',
+                lineColor: '#6E6E73',
+                secondaryColor: '#F5F5F7',
+                tertiaryColor: '#E8E8ED'
+            }
+        });
+        
+        // Initialize Highlight.js
+        hljs.highlightAll();
+        
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+        
+        // Add animation on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -100px 0px'
+        };
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+        
+        document.querySelectorAll('.card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(card);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>BGS 应用层框架与任务设计（当前工程）</title>
+  <style>
+    :root{
+      --bg:#f4f6f9;
+      --card:#ffffff;
+      --text:#0b0f14;
+      --muted:#667085;
+      --line:#e5e7eb;
+      --accent:#0a84ff;
+      --accent-2:#22c55e;
+      --warn:#b45309;
+      --bad:#b91c1c;
+      --codebg:#0b0f14;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background: radial-gradient(900px 520px at 10% -10%, #e6f0ff 0%, var(--bg) 55%),
+                  radial-gradient(900px 420px at 90% -20%, #e8fff2 0%, var(--bg) 60%);
+      color:var(--text);
+      font: 15px/1.7 "SF Pro Display","SF Pro Text","Helvetica Neue","Avenir Next",sans-serif;
+    }
+    .page{max-width:1120px;margin:0 auto;padding:32px 22px 70px}
+    header{border:1px solid var(--line);background:linear-gradient(180deg,#fff 0%,#f7f9fc 100%);
+      border-radius:20px;padding:22px 24px;box-shadow:0 12px 30px rgba(15,23,42,0.08)}
+    h1{margin:0 0 6px 0;font-size:24px;letter-spacing:-0.02em}
+    .meta{color:var(--muted);font-size:13px}
+    .grid{display:grid;gap:16px}
+    @media(min-width:980px){ .grid.cols2{grid-template-columns:1fr 1fr} }
+    .card{
+      border:1px solid var(--line);border-radius:16px;background:var(--card);
+      padding:16px 18px;box-shadow:0 10px 24px rgba(15,23,42,0.06)
+    }
+    .card h3{margin:0 0 8px 0;font-size:16px}
+    .badge{
+      display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--line);
+      font-size:12px;color:var(--muted);background:#fff;margin-left:8px;
+    }
+    nav.toc{
+      border:1px solid var(--line);border-radius:16px;padding:12px 16px;background:var(--card);
+      margin: 18px 0 22px;
+    }
+    nav.toc a{color:var(--accent);text-decoration:none}
+    nav.toc a:hover{text-decoration:underline}
+    nav.toc ul{margin:8px 0 0 18px}
+    h2{margin:26px 0 10px;padding-top:8px;border-top:1px solid var(--line);font-size:19px}
+    h3{margin:14px 0 8px;font-size:16px}
+    p{margin:8px 0}
+    code, pre{font-family: "SF Mono","Menlo","Consolas",monospace}
+    pre{
+      background:var(--codebg);color:#e5e7eb;border-radius:14px;
+      padding:12px 14px;overflow:auto;margin:10px 0;
+    }
+    table{width:100%;border-collapse:collapse;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:10px 0 14px}
+    th,td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}
+    th{background:#f8fafc;font-weight:600}
+    tr:last-child td{border-bottom:none}
+    .note{border-left:4px solid var(--accent);background:#f2f7ff;padding:10px 12px;border-radius:12px;color:#0b2b66;margin:10px 0}
+    .warn{border-left:4px solid var(--warn);background:#fff7ed;padding:10px 12px;border-radius:12px;color:#7c2d12;margin:10px 0}
+    .bad{border-left:4px solid var(--bad);background:#fef2f2;padding:10px 12px;border-radius:12px;color:#7f1d1d;margin:10px 0}
+    .mono{font-family: "SF Mono","Menlo","Consolas",monospace}
+    .small{font-size:12.5px;color:var(--muted)}
+    svg{max-width:100%;height:auto}
+    footer{margin-top:26px;border-top:1px solid var(--line);padding-top:12px;color:var(--muted);font-size:12.5px}
+    @media print{
+      .page{max-width:none;padding:18mm}
+      nav.toc{page-break-inside:avoid}
+      pre,table,.card,svg{page-break-inside:avoid}
+      a{color:inherit;text-decoration:none}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>BGS 应用层框架与任务设计 <span class="badge">当前工程</span></h1>
+    <div class="meta">
+      日期：2026-02-07<br/>
+      平台：GD32C231G8（48MHz, 64KB Flash） / ADC + DMA / PLS_SO 双边沿 EXTI / NPN 输出<br/>
+      目标：5ms 响应；A/B 相位约 100us，A+B 一周期约 200us
+    </div>
+  </header>
+
+  <nav class="toc">
+    <strong>目录</strong>
+    <ul>
+      <li><a href="#sec0">0. 概览</a></li>
+      <li><a href="#sec1">1. 分层与模块职责</a></li>
+      <li><a href="#sec2">2. 采样时序与数据流</a></li>
+      <li><a href="#sec3">3. 主循环与中断协作</a></li>
+      <li><a href="#sec4">4. 关键任务说明</a></li>
+      <li><a href="#sec5">5. param_config.h 结构与寄存器定义</a></li>
+      <li><a href="#sec6">6. 参数与掉电保存</a></li>
+      <li><a href="#sec7">7. 需要注意的实现点</a></li>
+      <li><a href="#sec8">8. 系统总体设计</a></li>
+      <li><a href="#sec9">9. 驱动层详细设计</a></li>
+      <li><a href="#sec10">10. 应用层详细设计</a></li>
+      <li><a href="#sec11">11. 数据结构设计</a></li>
+      <li><a href="#sec12">12. 关键算法说明</a></li>
+      <li><a href="#sec13">13. 通信与调试</a></li>
+    </ul>
+  </nav>
+
+  <section id="sec0">
+    <h2>0. 概览</h2>
+    <div class="grid cols2">
+      <div class="card">
+        <h3>核心检测链路</h3>
+        <ol>
+          <li>PLS_SO 进入 EXTI5_9（双边沿），仅置位采样标志</li>
+          <li>主循环触发 MeasureTask，按 PLS_SO 电平选择 A/B DMA 缓冲区</li>
+          <li>Timer2 触发 ADC，DMA 采样 SAMPLE_POINT 点（默认 10）</li>
+          <li>DMA 完成中断置位 g_isSampleDone，进入 AnalyzeTask</li>
+          <li>AnalyzeTask：FastTrimmedMean 后计算 V_A、V_B 与差分 V_OUT</li>
+          <li>OutputTask：与 V_SET 比较得到 presence，驱动 NPN 输出</li>
+          <li>LedTask：Light/Dark 模式显示工作灯</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>关键参数与信号</h3>
+        <ul>
+          <li>V_SET：阈值（mV），Flash 保存</li>
+          <li>led_mode：Light-ON / Dark-ON（Flash 保存）</li>
+          <li>PLS_SO：A/B 相位标志，约 10kHz 翻转</li>
+          <li>SH_OUT：模拟输出，ADC 采样</li>
+        </ul>
+        <div class="note">
+          <strong>原则：</strong>presence 是物理检测语义；Light/Dark 只影响输出映射与指示灯显示。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec1">
+    <h2>1. 分层与模块职责</h2>
+    <div class="grid cols2">
+      <div class="card">
+        <h3>分层</h3>
+        <table>
+          <thead><tr><th>层级</th><th>模块</th><th>职责</th></tr></thead>
+          <tbody>
+            <tr><td><strong>BSP</strong></td><td>bsp_gpio / bsp_adc / bsp_exit / systick</td><td>GPIO、ADC+DMA、EXTI、延时</td></tr>
+            <tr><td><strong>Driver</strong></td><td>ISL700_2A</td><td>GPIO Bit-bang 写寄存器 + CRC</td></tr>
+            <tr><td><strong>Service</strong></td><td>task_param</td><td>参数缓存、NVM A/B 页、CRC32</td></tr>
+            <tr><td><strong>App</strong></td><td>task.c / task_meas / task_analyze / task_output / task_led / task_btn</td><td>任务调度、采样、分析、输出、人机</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>主变量与标志</h3>
+        <table>
+          <thead><tr><th>变量</th><th>位置</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr><td>g_param_cfg</td><td>main.c</td><td>全局参数缓存（volatile）</td></tr>
+            <tr><td>g_isStartSampling</td><td>main.c</td><td>EXTI 触发采样标志</td></tr>
+            <tr><td>g_isSampleDone</td><td>main.c</td><td>DMA 完成标志</td></tr>
+            <tr><td>g_outputState</td><td>task_output.c</td><td>输出状态机</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec2">
+    <h2>2. 采样时序与数据流</h2>
+    <div class="note">
+      Timer2 设定为 100kHz 触发 ADC（48MHz / 480 = 100kHz），SAMPLE_POINT=10，单次采样约 100us。
+      PLS_SO A/B 相位约 100us，对应一组采样。
+    </div>
+
+    <div class="grid cols2">
+      <div class="card">
+        <h3>流程图（时序）</h3>
+        <svg viewBox="0 0 640 260" role="img" aria-label="Timing diagram">
+          <rect x="0" y="0" width="640" height="260" fill="#ffffff" rx="12" />
+          <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="12" fill="#111827">
+            <text x="20" y="26">PLS_SO</text>
+            <text x="20" y="86">ADC_TRIG</text>
+            <text x="20" y="146">DMA</text>
+            <text x="20" y="206">Main Loop</text>
+          </g>
+          <g stroke="#111827" stroke-width="2" fill="none">
+            <path d="M120 20 L120 40 L200 40 L200 20 L280 20 L280 40 L360 40 L360 20 L440 20 L440 40 L520 40 L520 20" />
+            <path d="M120 80 L140 80 L140 60 L150 60 L150 80 L170 80 L170 60 L180 60 L180 80 L200 80" />
+            <path d="M280 80 L300 80 L300 60 L310 60 L310 80 L330 80 L330 60 L340 60 L340 80 L360 80" />
+            <path d="M440 80 L460 80 L460 60 L470 60 L470 80 L490 80 L490 60 L500 60 L500 80 L520 80" />
+            <rect x="120" y="120" width="80" height="20" rx="4" fill="#e5f2ff" stroke="#0a84ff" />
+            <rect x="280" y="120" width="80" height="20" rx="4" fill="#e5f2ff" stroke="#0a84ff" />
+            <rect x="440" y="120" width="80" height="20" rx="4" fill="#e5f2ff" stroke="#0a84ff" />
+            <rect x="120" y="180" width="120" height="24" rx="6" fill="#ecfdf3" stroke="#22c55e" />
+            <rect x="280" y="180" width="120" height="24" rx="6" fill="#ecfdf3" stroke="#22c55e" />
+            <rect x="440" y="180" width="120" height="24" rx="6" fill="#ecfdf3" stroke="#22c55e" />
+          </g>
+          <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="11" fill="#0f172a">
+            <text x="126" y="134">DMA A</text>
+            <text x="286" y="134">DMA B</text>
+            <text x="446" y="134">DMA A</text>
+            <text x="130" y="197">Analyze/Output</text>
+            <text x="290" y="197">Analyze/Output</text>
+            <text x="450" y="197">Analyze/Output</text>
+          </g>
+        </svg>
+      </div>
+      <div class="card">
+        <h3>当前实现要点</h3>
+        <ul>
+          <li>MeasureTask 读取 PLS_SO 电平选择 A/B buffer</li>
+          <li>ADC_StartSampling 启动 DMA 采样，完成后由 DMA ISR 置位 g_isSampleDone</li>
+          <li>AnalyzeTask 做去极值平均，计算 V_A、V_B 与 V_OUT</li>
+        </ul>
+        <pre><code>MeasureTask:
+  if PLS_SO == High -> use B buffer
+  else              -> use A buffer
+  ADC_StartSampling()</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec3">
+    <h2>3. 主循环与中断协作</h2>
+    <div class="card">
+      <h3>主循环（superloop）</h3>
+      <pre><code>while (1) {
+  if (g_isSysTickInt) { SysTickTask(); }
+  if (g_isStartSampling) { MeasureTask(); }
+  if (g_isSampleDone) {
+    AnalyzeTask();
+    OutputTask();
+    LedTask();
+  }
+}</code></pre>
+      <div class="note">
+        EXTI 只置位 g_isStartSampling，DMA ISR 只置位 g_isSampleDone；计算工作全部在主循环完成。
+      </div>
+    </div>
+
+    <div class="grid cols2">
+      <div class="card">
+        <h3>中断职责</h3>
+        <table>
+          <thead><tr><th>中断</th><th>动作</th></tr></thead>
+          <tbody>
+            <tr><td>SysTick</td><td>置位 g_isSysTickInt，提供 10ms 按键节拍</td></tr>
+            <tr><td>EXTI5_9 (PLS_SO)</td><td>若上次采样完成，则置位 g_isStartSampling</td></tr>
+            <tr><td>DMA CH0</td><td>采样完成，置位 g_isSampleDone</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>状态机（采样到输出）</h3>
+        <svg viewBox="0 0 640 220" role="img" aria-label="State machine">
+          <rect x="0" y="0" width="640" height="220" fill="#ffffff" rx="12" />
+          <g fill="#ffffff" stroke="#0f172a" stroke-width="2">
+            <rect x="40" y="40" width="140" height="46" rx="12" />
+            <rect x="230" y="40" width="140" height="46" rx="12" />
+            <rect x="420" y="40" width="160" height="46" rx="12" />
+            <rect x="230" y="140" width="140" height="46" rx="12" />
+          </g>
+          <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="12" fill="#0f172a">
+            <text x="78" y="68">IDLE</text>
+            <text x="252" y="68">SAMPLE</text>
+            <text x="450" y="68">ANALYZE</text>
+            <text x="255" y="168">OUTPUT</text>
+          </g>
+          <g stroke="#0a84ff" stroke-width="2" fill="none" marker-end="url(#arrow)">
+            <defs>
+              <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <path d="M0,0 L6,3 L0,6" fill="#0a84ff" />
+              </marker>
+            </defs>
+            <path d="M180 63 L230 63" />
+            <path d="M370 63 L420 63" />
+            <path d="M500 86 L370 140" />
+            <path d="M230 163 L120 86" />
+          </g>
+          <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="10" fill="#6b7280">
+            <text x="188" y="52">PLS_SO edge</text>
+            <text x="380" y="52">DMA done</text>
+            <text x="420" y="122">Analyze done</text>
+            <text x="150" y="110">Loop</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec4">
+    <h2>4. 关键任务说明</h2>
+    <div class="grid cols2">
+      <div class="card">
+        <h3>Task_Init / SysTickTask</h3>
+        <p><strong>文件：</strong>task.c</p>
+        <pre><code>void Task_Init(void);
+void SysTickTask(void);</code></pre>
+        <ul>
+          <li>Task_Init：ParamCfg_Init → LedTask_Init → BtnTask_Init</li>
+          <li>SysTickTask：每 1ms 进入，10ms 调度 BtnTask</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>MeasureTask / AnalyzeTask</h3>
+        <p><strong>文件：</strong>task_meas.c / task_analyze.c</p>
+        <pre><code>void MeasureTask(void);
+void AnalyzeTask(void);
+uint16_t FastTrimmedMean(const volatile uint16_t *buf,
+                         uint16_t len, uint16_t discard);</code></pre>
+        <ul>
+          <li>MeasureTask：按 PLS_SO 电平选择 A/B DMA buffer，并启动 ADC 采样</li>
+          <li>AnalyzeTask：计算 V_A、V_B，并得到 V_OUT（当前 V_A - V_B）</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>OutputTask</h3>
+        <p><strong>文件：</strong>task_output.c</p>
+        <pre><code>void OutputTask(void);
+extern __IO output_state_t g_outputState;</code></pre>
+        <ul>
+          <li>V_OUT 与 V_SET 比较，得到 OBJECT_PRESENT / NO_OBJECT</li>
+          <li>NPN 直接映射 presence（未做 Light/Dark 反相）</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>BtnTask / LedTask</h3>
+        <p><strong>文件：</strong>task_btn.c / task_led.c</p>
+        <pre><code>void BtnTask(void);
+void BtnTask_Init(void);
+btn_state_t Btn_GetState(void);
+
+void LedTask(void);
+void LedTask_Init(void);
+void LED_SetMode(led_mode_t mode);
+led_mode_t LED_GetMode(void);</code></pre>
+        <ul>
+          <li>按键去抖后切换 Light/Dark，并调用 ParamCfg_SetLedMode 保存</li>
+          <li>工作灯显示 Light/Dark 模式，电源灯常亮</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>ParamCfg（参数服务）</h3>
+        <p><strong>文件：</strong>task_param.c</p>
+        <pre><code>void ParamCfg_Init(void);
+void ParamCfg_ApplyToIC(void);
+bool ParamCfg_Save(const volatile param_config_t *param);
+bool ParamCfg_SetLedMode(led_mode_t mode);
+uint16_t ParamCfg_GetVset(void);
+led_mode_t ParamCfg_GetLedMode(void);
+void ParamCfg_Print(volatile param_config_t *cfg);</code></pre>
+        <ul>
+          <li>NVM A/B 页 + CRC32，写入成功后更新 g_param_cfg</li>
+          <li>ISL700 仅使用 isl700_config_t 部分写寄存器</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>BSP 驱动接口（关键）</h3>
+        <p><strong>文件：</strong>bsp.c / bsp_adc.c / bsp_exit.c / bsp_gpio.c</p>
+        <pre><code>void BSP_Init(void);
+void BSP_ICPinConfig(void);
+void PLS_SO_InterruptInit(void);
+void ADC_UserInit(void);
+void ADC_StartSampling(void);
+void ADC_SwitchBuffer(uint16_t *buf);
+void NPN_Set(void);
+void NPN_Clr(void);</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec5">
+    <h2>5. param_config.h 结构与寄存器定义</h2>
+    <div class="card">
+      <h3>结构体划分</h3>
+      <pre><code>typedef struct {
+  isl700_config_t isl700;  // 14 bytes
+  app_config_t    app;     // 3 bytes
+} param_config_t;</code></pre>
+      <table>
+        <thead><tr><th>结构体</th><th>字段</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td>isl700_config_t</td><td>pls / fine_gain / coarse_gain1 等</td><td>IC 寄存器配置（写入 ISL700）</td></tr>
+          <tr><td>app_config_t</td><td>v_set / led_mode</td><td>应用层参数（Flash 保存）</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>ISL700_2A 寄存器字段映射（SR 位段）</h3>
+      <table>
+        <thead><tr><th>SR 位段</th><th>字段名</th><th>默认值</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>3:0</td><td>fuse_check_low</td><td>9</td><td>固定不修改</td></tr>
+          <tr><td>11:4</td><td>pls</td><td>255</td><td>发射脉冲幅值（与 pls-delay 相关）</td></tr>
+          <tr><td>13:12</td><td>no_used</td><td>1</td><td>保留未使用</td></tr>
+          <tr><td>23:14</td><td>fine_gain</td><td>62</td><td>细调增益，code 越大增益越大</td></tr>
+          <tr><td>24</td><td>gain_select</td><td>0</td><td>0=x1, 1=x1.5</td></tr>
+          <tr><td>28:25</td><td>fuse_check_middle</td><td>10</td><td>固定不修改</td></tr>
+          <tr><td>32:29</td><td>coarse_gain1</td><td>15</td><td>粗调增益 1</td></tr>
+          <tr><td>36:33</td><td>coarse_gain2</td><td>1</td><td>粗调增益 2（建议为 0）</td></tr>
+          <tr><td>40:37</td><td>sctrl_res_a</td><td>5</td><td>前级增益 a（建议 <= 8）</td></tr>
+          <tr><td>44:41</td><td>sctrl_res_b</td><td>5</td><td>前级增益 b（建议 <= 8）</td></tr>
+          <tr><td>45</td><td>sctrl_internal</td><td>1</td><td>0=外部电阻，1=内部电阻</td></tr>
+          <tr><td>49:46</td><td>fuse_check_high</td><td>6</td><td>固定不修改</td></tr>
+          <tr><td>57:50</td><td>fuse_check_floating</td><td>0</td><td>CRC 计算后由驱动填写</td></tr>
+        </tbody>
+      </table>
+      <div class="note">
+        CRC 由 ISL700_Write_Reg 内部计算并发送，fuse_check_floating 保持默认值即可。
+      </div>
+    </div>
+  </section>
+
+  <section id="sec6">
+    <h2>6. 参数与掉电保存</h2>
+    <div class="card">
+      <table>
+        <thead><tr><th>项目</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>g_param_cfg</td><td>全局参数缓存（volatile），ISL700 + APP 参数</td></tr>
+          <tr><td>ParamCfg_Save</td><td>拷贝快照后写入 NVM，写完更新 g_param_cfg</td></tr>
+          <tr><td>NVM 结构</td><td>magic + seq + param + crc32 + padding（双页 A/B）</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="sec7">
+    <h2>7. 需要注意的实现点</h2>
+    <div class="bad">
+      <ul>
+        <li>需求为 V = V_B - V_A 且 V <= V_SET 判“检测到目标”，当前实现为 V_A - V_B 且 V_OUT >= V_SET。</li>
+        <li>Light/Dark 当前只影响工作灯，不影响 NPN 输出映射。</li>
+        <li>main.c 中使用 exti_software_interrupt_enable 进行测试，量产需确认是否移除。</li>
+      </ul>
+    </div>
+    <div class="warn">
+      <ul>
+        <li>g_param_cfg 为 volatile，全局读写需注意中断/主循环并发访问。</li>
+        <li>输出响应 5ms，当前采样/分析链路可满足，但需确认滤波窗口与主循环负载。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="sec8">
+    <h2>8. 系统总体设计</h2>
+    <div class="grid cols2">
+      <div class="card">
+        <h3>软件架构图（驱动层 + 应用层）</h3>
+        <svg viewBox="0 0 700 260" role="img" aria-label="Architecture diagram">
+          <rect x="0" y="0" width="700" height="260" fill="#ffffff" rx="12" />
+          <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="12" fill="#0f172a">
+            <text x="40" y="30">Application Layer</text>
+            <text x="40" y="140">Driver/BSP Layer</text>
+          </g>
+          <g stroke="#0a84ff" stroke-width="2" fill="#f2f7ff">
+            <rect x="40" y="40" width="620" height="80" rx="10" />
+          </g>
+          <g stroke="#22c55e" stroke-width="2" fill="#ecfdf3">
+            <rect x="40" y="150" width="620" height="80" rx="10" />
+          </g>
+          <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="11" fill="#0f172a">
+            <text x="60" y="80">Task_Init / SysTickTask / MeasureTask / AnalyzeTask</text>
+            <text x="60" y="100">OutputTask / LedTask / BtnTask / ParamCfg</text>
+            <text x="60" y="190">bsp_gpio / bsp_adc / bsp_exit / systick / ISL700_2A</text>
+          </g>
+        </svg>
+      </div>
+      <div class="card">
+        <h3>模块依赖关系</h3>
+        <ul>
+          <li>main.c 依赖 BSP_Init / Task_Init / ParamCfg_ApplyToIC</li>
+          <li>MeasureTask 依赖 bsp_adc、bsp_exit（PLS_SO）、DMA ISR</li>
+          <li>AnalyzeTask 依赖 g_A_Buffer/g_B_Buffer 与参数 V_SET</li>
+          <li>OutputTask 依赖 ParamCfg_GetVset 与 NPN GPIO</li>
+          <li>BtnTask/LedTask 依赖 ParamCfg_SetLedMode / ParamCfg_GetLedMode</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>数据流向说明</h3>
+        <ol>
+          <li>PLS_SO 边沿 → EXTI → g_isStartSampling</li>
+          <li>MeasureTask → ADC + DMA → g_A_Buffer / g_B_Buffer</li>
+          <li>AnalyzeTask → V_A / V_B / V_OUT</li>
+          <li>OutputTask → g_outputState → NPN 输出</li>
+          <li>BtnTask → led_mode → ParamCfg_Save → Flash</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>硬件平台信息</h3>
+        <table>
+          <thead><tr><th>项目</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>MCU</td><td>GD32C231G8（48MHz, 64KB Flash）</td></tr>
+            <tr><td>采样接口</td><td>ADC 单通道 + DMA，Timer2 触发</td></tr>
+            <tr><td>相位输入</td><td>PLS_SO → EXTI5_9（双边沿）</td></tr>
+            <tr><td>输出接口</td><td>NPN GPIO 输出（bsp_gpio）</td></tr>
+            <tr><td>调试输出</td><td>SEGGER RTT + printf</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec9">
+    <h2>9. 驱动层详细设计</h2>
+    <div class="grid cols2">
+      <div class="card">
+        <h3>硬件抽象层：GPIO/ADC/EXTI 配置表</h3>
+        <table>
+          <thead><tr><th>接口</th><th>用途</th><th>文件</th></tr></thead>
+          <tbody>
+            <tr><td>GPIO</td><td>LED/NPN/BTN/PLS_SO/ISL700 Bit-bang</td><td>bsp_gpio.c</td></tr>
+            <tr><td>ADC + DMA</td><td>SH_OUT 采样 + A/B 缓冲区</td><td>bsp_adc.c</td></tr>
+            <tr><td>EXTI</td><td>PLS_SO 双边沿中断</td><td>bsp_exit.c</td></tr>
+            <tr><td>SysTick</td><td>1ms 时基</td><td>systick.c</td></tr>
+          </tbody>
+        </table>
+        <p class="small">本工程未使用 I2C/SPI 接口。</p>
+      </div>
+      <div class="card">
+        <h3>引脚映射关系（摘要）</h3>
+        <table>
+          <thead><tr><th>信号</th><th>端口</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>PLS_SO</td><td>PA6 (EXTI_6)</td><td>相位标志输入</td></tr>
+            <tr><td>ADC_IN</td><td>PA1 (ADC_CH1)</td><td>SH_OUT 采样</td></tr>
+            <tr><td>NPN_OUT</td><td>PC14</td><td>输出控制</td></tr>
+            <tr><td>BTN</td><td>PA7</td><td>按键输入</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>电气/时序特性（当前实现）</h3>
+        <ul>
+          <li>PLS_SO 翻转：约 10kHz，相位 100us</li>
+          <li>ADC 触发：Timer2 100kHz，单次采样 10 点 ≈ 100us</li>
+          <li>响应目标：5ms（当前采样链路可满足）</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>底层驱动接口映射</h3>
+        <table>
+          <thead><tr><th>需求接口</th><th>当前工程对应</th></tr></thead>
+          <tbody>
+            <tr><td>sensor_init()</td><td>BSP_Init() + ParamCfg_Init() + ParamCfg_ApplyToIC()</td></tr>
+            <tr><td>sensor_read_status()</td><td>AnalyzeTask() / g_outputState</td></tr>
+            <tr><td>sensor_configure()</td><td>ParamCfg_SetIC() / ParamCfg_SetApp()</td></tr>
+            <tr><td>sensor_isr_handler()</td><td>EXTI5_9_IRQHandler() / DMA_Channel0_IRQHandler()</td></tr>
+            <tr><td>sensor_error_handle()</td><td>当前为占位（无统一错误处理）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>中断服务流程</h3>
+        <ul>
+          <li>触发条件：PLS_SO 边沿 / DMA 传输完成 / SysTick 1ms</li>
+          <li>临界区：ISR 只置位标志，不做复杂计算</li>
+          <li>标志位：g_isStartSampling / g_isSampleDone / g_isSysTickInt</li>
+          <li>事件传递：主循环轮询标志，调用任务处理</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>硬件初始化序列（按时间顺序）</h3>
+        <ol>
+          <li>SysTick 初始化（1ms 时基）</li>
+          <li>GPIO 初始化（LED/NPN/BTN/PLS_SO/ISL700 IO）</li>
+          <li>PLS_SO EXTI 配置（双边沿）</li>
+          <li>ADC + DMA + Timer2 配置</li>
+          <li>ParamCfg_Init 读取 NVM 默认参数</li>
+          <li>ParamCfg_ApplyToIC 配置 ISL700_2A</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec10">
+    <h2>10. 应用层详细设计</h2>
+    <div class="grid cols2">
+      <div class="card">
+        <h3>API 接口规范（当前工程）</h3>
+        <table>
+          <thead><tr><th>函数</th><th>参数</th><th>返回值</th><th>调用方式</th></tr></thead>
+          <tbody>
+            <tr><td>MeasureTask()</td><td>无</td><td>void</td><td>异步（由 EXTI 标志驱动）</td></tr>
+            <tr><td>AnalyzeTask()</td><td>无</td><td>void</td><td>同步（主循环）</td></tr>
+            <tr><td>OutputTask()</td><td>无</td><td>void</td><td>同步（主循环）</td></tr>
+            <tr><td>ParamCfg_Save()</td><td>param</td><td>bool</td><td>同步（调用方等待）</td></tr>
+          </tbody>
+        </table>
+        <p class="small">当前工程未使用回调机制，采用标志位 + 主循环调度。</p>
+      </div>
+      <div class="card">
+        <h3>业务逻辑层状态机</h3>
+        <ul>
+          <li>空闲 → 检测中：PLS_SO 边沿触发 g_isStartSampling</li>
+          <li>检测中 → 触发：DMA 完成后 AnalyzeTask 计算完成</li>
+          <li>触发 → 空闲：完成 OutputTask / LedTask 后回到等待</li>
+          <li>错误恢复：当前为占位，未实现统一错误恢复策略</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>阈值管理逻辑</h3>
+        <ul>
+          <li>阈值 V_SET 存放在 g_param_cfg.app.v_set</li>
+          <li>OutputTask 直接比较 V_OUT 与 V_SET</li>
+          <li>动态修改通过 ParamCfg_SetVset / ParamCfg_Save</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>多传感器协同</h3>
+        <p>当前工程为单通道单传感器设计，无多传感器协同机制。</p>
+      </div>
+      <div class="card">
+        <h3>配置管理方案</h3>
+        <ul>
+          <li>默认参数：PARAM_CONFIG_DEFAULT</li>
+          <li>运行时修改：ParamCfg_SetApp / ParamCfg_SetIC / ParamCfg_Save</li>
+          <li>掉电保存：NVM A/B 页 + CRC32</li>
+          <li>合法性检查：目前为隐式（未做范围校验）</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec11">
+    <h2>11. 数据结构设计</h2>
+    <div class="card">
+      <pre><code>typedef struct {
+  uint16_t v_set;
+  uint8_t  led_mode;
+} app_config_t;
+
+typedef struct {
+  isl700_config_t isl700;
+  app_config_t    app;
+} param_config_t;
+
+typedef enum {
+  NO_OBJECT = 0,
+  OBJECT_PRESENT = 1,
+  SHORT_CIRCUIT = -1
+} output_state_t;</code></pre>
+      <p class="small">需求模板中的 SensorConfig/SensorState 可映射为 app_config_t 与 output_state_t。</p>
+    </div>
+  </section>
+
+  <section id="sec12">
+    <h2>12. 关键算法说明</h2>
+    <div class="grid cols2">
+      <div class="card">
+        <h3>数字滤波算法</h3>
+        <ul>
+          <li>FastTrimmedMean：对采样点去极值后平均</li>
+          <li>异常值剔除：discard N（默认 1）</li>
+          <li>未实现移动平均与输出去抖</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>校准算法</h3>
+        <ul>
+          <li>当前无自动基线校准</li>
+          <li>无环境光补偿与温漂补偿</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec13">
+    <h2>13. 通信与调试</h2>
+    <div class="card">
+      <h3>与主控的数据交换</h3>
+      <p>当前工程无外部通信协议（未集成 UART/I2C/SPI 数据交换）。</p>
+    </div>
+    <div class="card">
+      <h3>调试输出格式</h3>
+      <pre><code>printf("V_A: %u mV\r\n", V_A);
+printf("V_B: %u mV\r\n", V_B);
+printf("Object Present!\r\n");</code></pre>
+      <p class="small">底层使用 SEGGER RTT 进行 printf 输出。</p>
+    </div>
+  </section>
+
+  <footer>
+    本说明基于当前工程源码梳理，用于功能对齐与架构沟通。
+  </footer>
+</div>
+</body>
+</html>

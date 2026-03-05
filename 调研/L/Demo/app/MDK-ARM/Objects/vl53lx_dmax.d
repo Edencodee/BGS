@@ -1,0 +1,16 @@
+.\objects\vl53lx_dmax.o: ..\..\API\src\vl53lx_dmax.c
+.\objects\vl53lx_dmax.o: ..\..\API\inc\vl53lx_platform_log.h
+.\objects\vl53lx_dmax.o: ..\..\API\inc\vl53lx_platform_user_config.h
+.\objects\vl53lx_dmax.o: ..\..\API\inc\vl53lx_types.h
+.\objects\vl53lx_dmax.o: D:\programs\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\vl53lx_dmax.o: D:\programs\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
+.\objects\vl53lx_dmax.o: D:\programs\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+.\objects\vl53lx_dmax.o: D:\programs\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+.\objects\vl53lx_dmax.o: D:\programs\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h
+.\objects\vl53lx_dmax.o: ..\..\API\inc\vl53lx_core_support.h
+.\objects\vl53lx_dmax.o: ..\..\API\inc\vl53lx_hist_structs.h
+.\objects\vl53lx_dmax.o: ..\..\API\inc\vl53lx_ll_device.h
+.\objects\vl53lx_dmax.o: ..\..\API\inc\vl53lx_dmax_structs.h
+.\objects\vl53lx_dmax.o: ..\..\API\inc\vl53lx_error_codes.h
+.\objects\vl53lx_dmax.o: ..\..\API\inc\vl53lx_dmax.h
+.\objects\vl53lx_dmax.o: ..\..\API\inc\vl53lx_dmax_private_structs.h

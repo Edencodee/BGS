@@ -1,0 +1,123 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Tool Versions:</h2>
+IDE-Version: ¦ÌVision V5.39.0.0
+Copyright (C) 2023 ARM Ltd and ARM Germany GmbH. All rights reserved.
+License Information: ddd ddd, ddd, LIC=32B1Q-N07PS-56PQ2-9TXHZ-5GI98-DI7FS
+ 
+Tool Versions:
+Toolchain:       MDK-ARM Plus  Version: 5.39.0.0
+Toolchain Path:  D:\programs\Keil_v5\ARM\ARMCLANG\Bin
+C Compiler:      ArmClang.exe V6.21
+Assembler:       Armasm.exe V6.21
+Linker/Locator:  ArmLink.exe V6.21
+Library Manager: ArmAr.exe V6.21
+Hex Converter:   FromElf.exe V6.21
+CPU DLL:         
+Dialog DLL:      
+Target DLL:      Segger\JL2CM3.dll V2.99.43.0
+Dialog DLL:      TCM.DLL V1.56.4.0
+ 
+<h2>Project:</h2>
+D:\Workspace\doc\HP6_BS\Proj\V1.0\Test\V1.0.2\App\Keil_project\App.uvprojx
+Project File Date:  02/26/2026
+
+<h2>Output:</h2>
+*** Using Compiler 'V6.21', folder: 'D:\programs\Keil_v5\ARM\ARMCLANG\Bin'
+Build target 'GD32C231'
+../src/debug_config.c(26): warning: format specifies type 'unsigned long' but the argument has type 'uint32_t' (aka 'unsigned int') [-Wformat]
+   26 |     DEBUG_STAT("Total Samples:   %lu\r\n", g_debug_stats.total_samples);
+      |                                  ~~~       ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                  %u
+../inc\debug_config.h(103): note: expanded from macro 'DEBUG_STAT'
+  103 |     #define DEBUG_STAT(fmt, ...) DEBUG_INFO("[STAT] " fmt, ##__VA_ARGS__)
+      |                                                       ~~~    ^~~~~~~~~~~
+../inc\debug_config.h(48): note: expanded from macro 'DEBUG_INFO'
+   48 |     #define DEBUG_INFO(fmt, ...) printf("[INFO] " fmt, ##__VA_ARGS__)
+      |                                                   ~~~    ^~~~~~~~~~~
+../src/debug_config.c(28): warning: format specifies type 'unsigned long' but the argument has type 'uint32_t' (aka 'unsigned int') [-Wformat]
+   27 |     DEBUG_STAT("Valid Samples:   %lu (%.1f%%)\r\n", 
+      |                                  ~~~
+      |                                  %u
+   28 |                g_debug_stats.valid_samples,
+      |                ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+../inc\debug_config.h(103): note: expanded from macro 'DEBUG_STAT'
+  103 |     #define DEBUG_STAT(fmt, ...) DEBUG_INFO("[STAT] " fmt, ##__VA_ARGS__)
+      |                                                       ~~~    ^~~~~~~~~~~
+../inc\debug_config.h(48): note: expanded from macro 'DEBUG_INFO'
+   48 |     #define DEBUG_INFO(fmt, ...) printf("[INFO] " fmt, ##__VA_ARGS__)
+      |                                                   ~~~    ^~~~~~~~~~~
+../src/debug_config.c(32): warning: format specifies type 'unsigned long' but the argument has type 'uint32_t' (aka 'unsigned int') [-Wformat]
+   31 |     DEBUG_STAT("Invalid Samples: %lu (%.1f%%)\r\n", 
+      |                                  ~~~
+      |                                  %u
+   32 |                g_debug_stats.invalid_samples,
+      |                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../inc\debug_config.h(103): note: expanded from macro 'DEBUG_STAT'
+  103 |     #define DEBUG_STAT(fmt, ...) DEBUG_INFO("[STAT] " fmt, ##__VA_ARGS__)
+      |                                                       ~~~    ^~~~~~~~~~~
+../inc\debug_config.h(48): note: expanded from macro 'DEBUG_INFO'
+   48 |     #define DEBUG_INFO(fmt, ...) printf("[INFO] " fmt, ##__VA_ARGS__)
+      |                                                   ~~~    ^~~~~~~~~~~
+../src/debug_config.c(35): warning: format specifies type 'unsigned long' but the argument has type 'uint32_t' (aka 'unsigned int') [-Wformat]
+   35 |     DEBUG_STAT("Out of Range:    %lu\r\n", g_debug_stats.out_of_range_count);
+      |                                  ~~~       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                  %u
+../inc\debug_config.h(103): note: expanded from macro 'DEBUG_STAT'
+  103 |     #define DEBUG_STAT(fmt, ...) DEBUG_INFO("[STAT] " fmt, ##__VA_ARGS__)
+      |                                                       ~~~    ^~~~~~~~~~~
+../inc\debug_config.h(48): note: expanded from macro 'DEBUG_INFO'
+   48 |     #define DEBUG_INFO(fmt, ...) printf("[INFO] " fmt, ##__VA_ARGS__)
+      |                                                   ~~~    ^~~~~~~~~~~
+../src/debug_config.c(36): warning: format specifies type 'unsigned long' but the argument has type 'uint32_t' (aka 'unsigned int') [-Wformat]
+   36 |     DEBUG_STAT("Object Detected: %lu\r\n", g_debug_stats.object_present_count);
+      |                                  ~~~       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                  %u
+../inc\debug_config.h(103): note: expanded from macro 'DEBUG_STAT'
+  103 |     #define DEBUG_STAT(fmt, ...) DEBUG_INFO("[STAT] " fmt, ##__VA_ARGS__)
+      |                                                       ~~~    ^~~~~~~~~~~
+../inc\debug_config.h(48): note: expanded from macro 'DEBUG_INFO'
+   48 |     #define DEBUG_INFO(fmt, ...) printf("[INFO] " fmt, ##__VA_ARGS__)
+      |                                                   ~~~    ^~~~~~~~~~~
+../src/debug_config.c(37): warning: format specifies type 'unsigned long' but the argument has type 'uint32_t' (aka 'unsigned int') [-Wformat]
+   37 |     DEBUG_STAT("State Changes:   %lu\r\n", g_debug_stats.state_transitions);
+      |                                  ~~~       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                  %u
+../inc\debug_config.h(103): note: expanded from macro 'DEBUG_STAT'
+  103 |     #define DEBUG_STAT(fmt, ...) DEBUG_INFO("[STAT] " fmt, ##__VA_ARGS__)
+      |                                                       ~~~    ^~~~~~~~~~~
+../inc\debug_config.h(48): note: expanded from macro 'DEBUG_INFO'
+   48 |     #define DEBUG_INFO(fmt, ...) printf("[INFO] " fmt, ##__VA_ARGS__)
+      |                                                   ~~~    ^~~~~~~~~~~
+6 warnings generated.
+compiling debug_config.c...
+linking...
+Program Size: Code=14128 RO-data=2252 RW-data=32 ZI-data=3392  
+".\output\Project.axf" - 0 Error(s), 6 Warning(s).
+
+<h2>Software Packages used:</h2>
+
+Package Vendor: ARM
+                https://www.keil.com/pack/ARM.CMSIS.6.1.0.pack
+                ARM::CMSIS@6.1.0
+                CMSIS (Common Microcontroller Software Interface Standard)
+   * Component: CORE Version: 6.1.0
+
+Package Vendor: GigaDevice
+                https://gd32mcu.com/data/documents/pack/GigaDevice.GD32C2x1_DFP.1.0.0.pack
+                GigaDevice::GD32C2x1_DFP@1.0.0
+                GigaDevice GD32C2x1 Series Device Support and Examples
+
+<h2>Collection of Component include folders:</h2>
+  ./RTE/_GD32C231
+  D:/programs/Keil_v5/Packs/ARM/CMSIS/6.1.0/CMSIS/Core/Include
+
+<h2>Collection of Component Files used:</h2>
+
+   * Component: ARM::CMSIS:CORE@6.1.0
+Build Time Elapsed:  00:00:03
+</pre>
+</body>
+</html>

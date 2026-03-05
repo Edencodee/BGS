@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADC + DMA 双缓冲采样数据错乱：问题排查与修复记录</title>
+<style>
+  :root {
+    --bg: #1e1e2e;
+    --surface: #27273a;
+    --surface2: #313147;
+    --border: #45455e;
+    --text: #cdd6f4;
+    --text-muted: #a6adc8;
+    --accent: #89b4fa;
+    --green: #a6e3a1;
+    --red: #f38ba8;
+    --yellow: #f9e2af;
+    --orange: #fab387;
+    --purple: #cba6f7;
+    --teal: #94e2d5;
+    --code-bg: #181825;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    padding: 0 0 60px;
+  }
+  /* ─── Header ─── */
+  .page-header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border-bottom: 2px solid var(--accent);
+    padding: 40px 0 32px;
+    text-align: center;
+  }
+  .page-header h1 { font-size: 1.8rem; color: var(--accent); margin-bottom: 10px; }
+  .page-header .meta { color: var(--text-muted); font-size: 0.9rem; }
+  .page-header .meta span { margin: 0 12px; }
+  /* ─── Layout ─── */
+  .container { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+  /* ─── TOC ─── */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin: 32px 0;
+  }
+  .toc h2 { font-size: 1rem; color: var(--accent); margin-bottom: 12px; }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin: 4px 0; }
+  .toc a { color: var(--text-muted); text-decoration: none; transition: color .2s; }
+  .toc a:hover { color: var(--accent); }
+  /* ─── Sections ─── */
+  section { margin-top: 48px; }
+  h2.section-title {
+    font-size: 1.35rem;
+    color: var(--accent);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2.section-title .num {
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 12px;
+  }
+  h3.sub { font-size: 1.1rem; color: var(--yellow); margin: 24px 0 10px; }
+  p { margin: 10px 0; color: var(--text); }
+  /* ─── Code ─── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.87rem;
+    line-height: 1.6;
+    margin: 12px 0;
+  }
+  code { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 0.9em; }
+  p code, li code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--teal);
+  }
+  .c-comment { color: #6c7086; }
+  .c-keyword { color: #cba6f7; }
+  .c-func    { color: #89b4fa; }
+  .c-str     { color: #a6e3a1; }
+  .c-num     { color: #fab387; }
+  .c-arrow   { color: var(--green); }
+  /* ─── Tables ─── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 0.92rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--accent);
+    padding: 10px 14px;
+    text-align: left;
+    border: 1px solid var(--border);
+  }
+  td {
+    padding: 9px 14px;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  tr:nth-child(even) td { background: var(--surface); }
+  tr:hover td { background: var(--surface2); }
+  /* ─── Callout boxes ─── */
+  .callout {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 14px 0;
+    border-left: 4px solid;
+    font-size: 0.93rem;
+  }
+  .callout.danger  { background: #3d1a1a; border-color: var(--red);    color: #f5c2c7; }
+  .callout.warn    { background: #3d2e0f; border-color: var(--yellow);  color: #f9e2af; }
+  .callout.success { background: #162316; border-color: var(--green);   color: #a6e3a1; }
+  .callout.info    { background: #1a2035; border-color: var(--accent);  color: #b9c8f7; }
+  .callout .label  { font-weight: 700; margin-bottom: 4px; }
+  /* ─── Fix cards ─── */
+  .fix-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .fix-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .fix-card .fix-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--green);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .fix-card .fix-title .badge {
+    background: var(--green);
+    color: var(--bg);
+    font-size: 0.75rem;
+    padding: 1px 8px;
+    border-radius: 10px;
+  }
+  .fix-card .fix-file {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .fix-card pre { margin: 0; padding: 12px; font-size: 0.82rem; }
+  /* ─── Timeline ─── */
+  .timeline { margin: 16px 0 0; }
+  .timeline-item {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .timeline-dot {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  .timeline-dot.red    { background: var(--red);    color: var(--bg); }
+  .timeline-dot.yellow { background: var(--yellow); color: var(--bg); }
+  .timeline-dot.green  { background: var(--green);  color: var(--bg); }
+  .timeline-body { flex: 1; }
+  .timeline-body h4 { color: var(--orange); margin-bottom: 6px; font-size: 1rem; }
+  /* ─── Timing diagram ─── */
+  .timing-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.84rem;
+    line-height: 1.75;
+    margin: 14px 0;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  /* ─── knowledgepoint ─── */
+  .kp-list { list-style: none; padding: 0; margin: 12px 0; }
+  .kp-list li {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .kp-list li .icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; }
+  .kp-list li .kp-body strong { color: var(--yellow); }
+  /* ─── Footer ─── */
+  footer {
+    margin-top: 60px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>ADC + DMA 双缓冲采样数据错乱<br>问题排查与修复记录</h1>
+  <div class="meta">
+    <span>📦 项目：HP6_BS · GD32C231 + ISL700_2A 光电传感器</span>
+    <span>🏷 版本：V1.0.2</span>
+    <span>📅 日期：2026-02-24</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- TOC -->
+  <div class="toc">
+    <h2>📋 目录</h2>
+    <ol>
+      <li><a href="#s1">系统背景</a></li>
+      <li><a href="#s2">问题现象与根因分析</a></li>
+      <li><a href="#s3">修复措施（Fix 1~6）</a></li>
+      <li><a href="#s4">修复前后对比</a></li>
+      <li><a href="#s5">最终正确时序</a></li>
+      <li><a href="#s6">延伸：ADC 采样知识点总结</a></li>
+    </ol>
+  </div>
+
+  <!-- ─── S1 系统背景 ─── -->
+  <section id="s1">
+    <h2 class="section-title"><span class="num">1</span>系统背景</h2>
+
+    <h3 class="sub">硬件拓扑</h3>
+    <div class="timing-box"><span class="c-comment">PLS_SO (PA6) ──EXTI双边沿──► ISR 锁存电平 → g_plsState
+                                            → g_isStartSampling = true
+SH_OUT (PA1) ──ADC_CH1──► ADC ──DMA──► g_A_Buffer[10] / g_B_Buffer[10]
+TIMER2 (T2_TRGO) ─────────────────────────────────────────► ADC 触发</span></div>
+
+    <h3 class="sub">测量原理</h3>
+    <table>
+      <tr><th>相位</th><th>PLS_SO 电平</th><th>DMA 写入目标</th><th>含义</th></tr>
+      <tr><td>A</td><td>LOW</td><td><code>g_A_Buffer</code></td><td>背景光期间采样</td></tr>
+      <tr><td>B</td><td>HIGH</td><td><code>g_B_Buffer</code></td><td>发射光期间采样</td></tr>
+    </table>
+    <p>每次完整测量 = A路采样 + B路采样，差分：<code>V_OUT = V_A - V_B</code></p>
+
+    <h3 class="sub">关键全局标志</h3>
+    <table>
+      <tr><th>标志</th><th>类型</th><th>作用</th></tr>
+      <tr><td><code>g_isSampleDone</code></td><td><code>__IO bool</code></td><td>DMA 空闲门控，防止 EXTI 重入</td></tr>
+      <tr><td><code>g_isStartSampling</code></td><td><code>__IO bool</code></td><td>主循环触发 MeasureTask 的信号</td></tr>
+      <tr><td><code>g_isA_Done</code></td><td><code>__IO bool</code></td><td>A路DMA完成标志</td></tr>
+      <tr><td><code>g_isB_Done</code></td><td><code>__IO bool</code></td><td>B路DMA完成标志</td></tr>
+      <tr><td><code>s_isFillingA</code></td><td><code>static volatile bool</code></td><td>ISR 分路置位用，记录当前写哪路缓冲</td></tr>
+    </table>
+  </section>
+
+  <!-- ─── S2 问题 ─── -->
+  <section id="s2">
+    <h2 class="section-title"><span class="num">2</span>问题现象与根因分析</h2>
+
+    <div class="timeline">
+
+      <!-- P0 -->
+      <div class="timeline-item">
+        <div class="timeline-dot red">P0</div>
+        <div class="timeline-body">
+          <h4>程序只运行一次就"卡死"</h4>
+          <p><strong>现象</strong>：上电后完成一次 AnalyzeTask，之后主循环永远不再进入分析。</p>
+          <div class="callout danger">
+            <div class="label">🔴 根因</div>
+            EXTI 配置为 <code>EXTI_TRIG_RISING</code>（只有上升沿）。主循环极快，
+            MeasureTask 执行时 PLS_SO 仍为 HIGH，每次都只填 <code>g_B_Buffer</code>，
+            <code>g_isA_Done</code> 永远不置位，<code>g_isA_Done &amp;&amp; g_isB_Done</code> 永远不成立。
+          </div>
+          <div class="callout warn">
+            <div class="label">⚠️ 当时的错误"解法"</div>
+            加 <code>delay_1ms(5)</code>，让主循环晚执行几毫秒，PLS 电平碰巧已跳低，属于
+            <strong>时序依赖的巧合</strong>，不可靠。
+          </div>
+        </div>
+      </div>
+
+      <!-- P1 -->
+      <div class="timeline-item">
+        <div class="timeline-dot red">P1</div>
+        <div class="timeline-body">
+          <h4>两路数据整组错乱（A路数据出现在B Buffer中）</h4>
+          <p><strong>触发条件</strong>：注释 delay 后几乎消失；加 <code>delay_1ms(20)</code> 后频繁复现。</p>
+
+          <p><strong>根因 A</strong>：EXTI 只监听上升沿，A路相位（下降沿）根本不触发中断</p>
+          <pre><span class="c-comment">// 错误</span>
+<span class="c-func">exti_init</span>(PLS_SO_EXTI_LINE, EXTI_INTERRUPT, EXTI_TRIG_RISING);</pre>
+
+          <p><strong>根因 B</strong>：<code>g_plsState</code> 在主循环中延迟读取，PLS 电平已变化</p>
+          <pre><span class="c-comment">// 错误：MeasureTask 内才读引脚，电平可能已跳变</span>
+<span class="c-keyword">void</span> <span class="c-func">MeasureTask</span>(<span class="c-keyword">void</span>) {
+    g_plsState = <span class="c-func">gpio_input_bit_get</span>(...);  <span class="c-comment">// ← 读的是"现在"不是"中断时"</span>
+}</pre>
+
+          <p><strong>根因 C</strong>：<code>delay_1ms(20)</code> 扩大了跨轮 flag 积累窗口</p>
+          <div class="timing-box"><span class="c-arrow">①</span> 上升沿EXTI → 填B → DMA完B → g_isB_Done=true
+   ↓ <span class="c-comment">delay 20ms 期间</span> ↓
+   下降沿EXTI → g_plsState=LOW, g_isStartSampling=true
+
+<span class="c-arrow">②</span> 循环顶: MeasureTask 填A → DMA完A → g_isA_Done=true
+   ↓ <span class="c-comment">delay 20ms 期间</span> ↓
+   上升沿EXTI → g_plsState=HIGH, g_isStartSampling=true
+
+<span class="c-arrow">③</span> 循环顶: MeasureTask 填B（<span class="c-comment">旧B正被覆盖！</span>）
+   → 检查: g_isA_Done=true &amp;&amp; g_isB_Done=true ← <span class="c-comment">两flag均true！</span>
+            A = ②本轮新数据
+            B = ①上轮旧数据，且<span class="c-comment">DMA正在覆盖中！</span>
+   → AnalyzeTask读B的同时DMA写B → 数据竞争 + 非配对</div>
+          <div class="callout danger">
+            <div class="label">🔴 结论</div>
+            delay 越长 → 跨轮 flag 积累窗口越大 → 整组错乱越频繁
+          </div>
+        </div>
+      </div>
+
+      <!-- P2 -->
+      <div class="timeline-item">
+        <div class="timeline-dot yellow">P2</div>
+        <div class="timeline-body">
+          <h4>每组数据 [0] 位被前一轮 RDATA 残留污染</h4>
+          <p><strong>现象</strong>：无论整组是否正确，<code>A[0]</code> 或 <code>B[0]</code> 总是出现异常值。</p>
+
+          <div class="callout warn">
+            <div class="label">📊 调试截图数据验证</div>
+            A[0]: 7 ← B路基线值（B的RDATA残留）&nbsp;&nbsp;&nbsp; A[1..9]: 547~534 ← A真实信号<br>
+            B[0]: 533 ← A路信号值（A的RDATA残留）&nbsp;&nbsp; B[1..9]: 7~8 ← B真实信号
+          </div>
+
+          <p><strong>根因</strong>：GD32 ADC 完成最后一次转换后，<code>RDATA</code> 寄存器保留旧值且 <strong>EOC 标志仍然置位</strong>（ADC DMA 请求由 EOC 驱动）。原 <code>ADC_SwitchBuffer</code> 末尾调用了 <code>dma_channel_enable</code>，此时 TIMER2 尚未启动，DMA Enable 后立即响应这个挂起的 EOC，将旧 <code>RDATA</code> 写入新缓冲区 <code>[0]</code>。</p>
+          <pre><span class="c-comment">// 旧错误时序</span>
+<span class="c-func">ADC_SwitchBuffer</span>(...):
+    <span class="c-func">dma_memory_address_config</span>(...)
+    <span class="c-func">dma_channel_enable</span>()   <span class="c-comment">// ← DMA立即响应挂起EOC → 写[0] ← 污染！</span>
+
+<span class="c-func">ADC_StartSampling</span>():
+    <span class="c-func">dma_channel_disable</span>()
+    <span class="c-func">dma_channel_enable</span>()   <span class="c-comment">// ← 实际有效的Enable</span>
+    <span class="c-func">timer_enable</span>(TIMER2)   <span class="c-comment">// Timer触发真实采样 → 写[1..9]</span></pre>
+        </div>
+      </div>
+
+    </div><!-- /timeline -->
+  </section>
+
+  <!-- ─── S3 修复 ─── -->
+  <section id="s3">
+    <h2 class="section-title"><span class="num">3</span>修复措施</h2>
+    <div class="fix-grid">
+
+      <div class="fix-card">
+        <div class="fix-title"><span class="badge">Fix 1</span>EXTI 改为双边沿触发</div>
+        <div class="fix-file">📄 BSP/src/bsp_exit.c</div>
+        <pre><span class="c-comment">// 修改前</span>
+<span class="c-func">exti_init</span>(..., EXTI_TRIG_RISING);
+
+<span class="c-comment">// 修改后</span>
+<span class="c-func">exti_init</span>(..., EXTI_TRIG_BOTH);</pre>
+      </div>
+
+      <div class="fix-card">
+        <div class="fix-title"><span class="badge">Fix 2</span>ISR 立即锁存 PLS 电平</div>
+        <div class="fix-file">📄 App/src/gd32c2x1_it.c</div>
+        <pre><span class="c-comment">// 修改后：中断触发时刻立即锁存</span>
+<span class="c-keyword">void</span> <span class="c-func">EXTI5_9_IRQHandler</span>(<span class="c-keyword">void</span>) {
+    g_plsState = (<span class="c-func">gpio_input_bit_get</span>(...))
+                 ? kHigh : kLow; <span class="c-comment">// ← 最准确的时刻</span>
+    g_isStartSampling = <span class="c-num">true</span>;
+}</pre>
+      </div>
+
+      <div class="fix-card">
+        <div class="fix-title"><span class="badge">Fix 3</span>g_isSampleDone=false 提前到函数入口</div>
+        <div class="fix-file">📄 App/src/task_meas.c</div>
+        <pre><span class="c-keyword">void</span> <span class="c-func">MeasureTask</span>(<span class="c-keyword">void</span>) {
+    g_isSampleDone = <span class="c-num">false</span>; <span class="c-comment">// ← 最先执行，关闭重入</span>
+    <span class="c-func">ADC_SwitchBuffer</span>(...);
+    <span class="c-func">ADC_StartSampling</span>();
+}</pre>
+      </div>
+
+      <div class="fix-card">
+        <div class="fix-title"><span class="badge">Fix 4</span>启动新路采样前清该路旧 Done 标志</div>
+        <div class="fix-file">📄 App/src/task_meas.c</div>
+        <pre><span class="c-keyword">if</span> (g_plsState == kHigh) {
+    g_isB_Done = <span class="c-num">false</span>;  <span class="c-comment">// ← 旧flag作废，防跨轮</span>
+    <span class="c-func">ADC_SwitchBuffer</span>(g_B_Buffer);
+} <span class="c-keyword">else</span> {
+    g_isA_Done = <span class="c-num">false</span>;
+    <span class="c-func">ADC_SwitchBuffer</span>(g_A_Buffer);
+}</pre>
+      </div>
+
+      <div class="fix-card">
+        <div class="fix-title"><span class="badge">Fix 5</span>ADC_SwitchBuffer 不再 Enable DMA</div>
+        <div class="fix-file">📄 BSP/src/bsp_adc.c</div>
+        <pre><span class="c-keyword">void</span> <span class="c-func">ADC_SwitchBuffer</span>(<span class="c-keyword">int16_t</span> *buf) {
+    s_isFillingA = (buf == (<span class="c-keyword">int16_t</span> *)g_A_Buffer);
+    <span class="c-func">dma_channel_disable</span>(ADC_DMA_CHANNEL);
+    <span class="c-func">dma_memory_address_config</span>(...);
+    <span class="c-func">dma_transfer_number_config</span>(...);
+    <span class="c-comment">// Enable 由 ADC_StartSampling 统一负责</span>
+}</pre>
+      </div>
+
+      <div class="fix-card">
+        <div class="fix-title"><span class="badge">Fix 6</span>Enable DMA 前清 ADC EOC 标志</div>
+        <div class="fix-file">📄 BSP/src/bsp_adc.c</div>
+        <pre><span class="c-keyword">void</span> <span class="c-func">ADC_StartSampling</span>(<span class="c-keyword">void</span>) {
+    <span class="c-func">dma_channel_disable</span>(...);
+    <span class="c-func">dma_transfer_number_config</span>(...);
+    <span class="c-func">adc_flag_clear</span>(ADC_FLAG_EOC); <span class="c-comment">// ← 撤销挂起请求</span>
+    <span class="c-func">dma_channel_enable</span>(...);       <span class="c-comment">// 此时无挂起EOC，安全</span>
+    <span class="c-func">timer_enable</span>(TIMER2);
+}</pre>
+      </div>
+
+    </div><!-- /fix-grid -->
+  </section>
+
+  <!-- ─── S4 对比 ─── -->
+  <section id="s4">
+    <h2 class="section-title"><span class="num">4</span>修复前后对比</h2>
+    <table>
+      <tr><th>问题</th><th>修复前</th><th>修复后</th></tr>
+      <tr>
+        <td>程序运行一次卡死</td>
+        <td>EXTI 仅上升沿，A路永不采样</td>
+        <td>EXTI 双边沿，A/B 均可触发</td>
+      </tr>
+      <tr>
+        <td><code>g_plsState</code> 读时机错误</td>
+        <td>MeasureTask 中延迟读引脚</td>
+        <td>EXTI ISR 中断时刻立即锁存</td>
+      </tr>
+      <tr>
+        <td>整组数据跨轮配对</td>
+        <td>delay 扩大窗口，旧 flag 残留触发误配</td>
+        <td>启动采样前先清该路旧 Done 标志</td>
+      </tr>
+      <tr>
+        <td>DMA 传输中途换缓冲</td>
+        <td><code>g_isSampleDone=false</code> 置位太晚</td>
+        <td>函数入口最先置 false</td>
+      </tr>
+      <tr>
+        <td>[0] 位被旧 RDATA 污染</td>
+        <td>SwitchBuffer 早于 Timer 多余 Enable DMA</td>
+        <td>只在 StartSampling 中统一 Enable，且先清 EOC</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- ─── S5 时序 ─── -->
+  <section id="s5">
+    <h2 class="section-title"><span class="num">5</span>最终正确时序（修复后）</h2>
+    <div class="timing-box"><span class="c-arrow">PLS上升沿</span>
+  → EXTI ISR: g_plsState=HIGH, g_isStartSampling=true
+  → 主循环: MeasureTask()
+      g_isSampleDone = false          <span class="c-comment">// 关闭 EXTI 重入窗口（最先执行）</span>
+      g_isB_Done    = false           <span class="c-comment">// 清除该路旧 flag，防跨轮配对</span>
+      <span class="c-func">ADC_SwitchBuffer</span>(g_B_Buffer)   <span class="c-comment">// 配置 DMA 地址（不 Enable）</span>
+      <span class="c-func">adc_flag_clear</span>(ADC_FLAG_EOC)    <span class="c-comment">// 清除挂起的旧 EOC</span>
+      <span class="c-func">dma_channel_enable</span>()            <span class="c-comment">// Enable DMA（此时无挂起请求）</span>
+      <span class="c-func">timer_enable</span>(TIMER2)            <span class="c-comment">// Timer 触发真实采样</span>
+  → DMA 完成中断: g_isB_Done=true, g_isSampleDone=true
+
+<span class="c-arrow">PLS下降沿</span>
+  → EXTI ISR: g_plsState=LOW, g_isStartSampling=true
+  → 主循环: MeasureTask()
+      g_isSampleDone = false
+      g_isA_Done    = false           <span class="c-comment">// 清除该路旧 flag</span>
+      <span class="c-func">ADC_SwitchBuffer</span>(g_A_Buffer)
+      <span class="c-func">adc_flag_clear</span>(ADC_FLAG_EOC)
+      <span class="c-func">dma_channel_enable</span>()
+      <span class="c-func">timer_enable</span>(TIMER2)
+  → DMA 完成中断: g_isA_Done=true, g_isSampleDone=true
+
+<span class="c-arrow">主循环检查</span>:
+  g_isA_Done &amp;&amp; g_isB_Done → true（同一轮 A+B 均完成）✅
+  → g_isA_Done=false, g_isB_Done=false
+  → <span class="c-func">AnalyzeTask</span>()   <span class="c-comment">// 读缓冲区时 DMA 已停止，无竞争</span>
+  → <span class="c-func">OutputTask</span>()
+  → <span class="c-func">LedTask</span>()</div>
+  </section>
+
+  <!-- ─── S6 知识点 ─── -->
+  <section id="s6">
+    <h2 class="section-title"><span class="num">6</span>延伸：ADC 采样知识点总结</h2>
+
+    <h3 class="sub">6.1 ADC EOC 标志与 DMA 挂起请求</h3>
+    <div class="callout danger">
+      <div class="label">⚠️ 关键规则</div>
+      ADC 每完成一次转换，EOC 标志置位，同时向 DMA 发出请求。若此时 DMA 未 Enable，
+      这个请求<strong>会被硬件保持（pending）</strong>，直到 DMA 被 Enable 后立即响应。
+      <br><br>
+      <strong>结论</strong>：Enable DMA 前必须用 <code>adc_flag_clear(ADC_FLAG_EOC)</code> 清除 EOC，
+      否则必然触发一次无效 DMA 传输写入缓冲区 <code>[0]</code>。
+    </div>
+    <pre><span class="c-comment">// 正确时序</span>
+<span class="c-func">dma_channel_disable</span>()
+<span class="c-func">adc_flag_clear</span>(ADC_FLAG_EOC)   <span class="c-comment">// ← 必须在 Enable 前清除</span>
+<span class="c-func">dma_channel_enable</span>()            <span class="c-comment">// 无挂起请求，等待 Timer 真实触发</span>
+<span class="c-func">timer_enable</span>(TIMER2)            <span class="c-comment">// Timer → TRGO → ADC 转换 → DMA 写 [0]</span></pre>
+
+    <h3 class="sub">6.2 Timer 触发 ADC 时序要求</h3>
+    <div class="timing-box"><span class="c-comment">正确：</span>  配置DMA地址 → 清EOC → Enable DMA → Enable Timer
+                                               ↑ Timer TRGO触发 → ADC转换 → 写[0]
+<span class="c-comment">错误：</span>  配置DMA地址 → Enable DMA → Enable Timer
+                   ↑ 残留EOC立即驱动DMA写[0]（旧值）→ Timer触发写[1..9]</div>
+
+    <h3 class="sub">6.3 多缓冲区切换的并发安全三原则</h3>
+    <ul class="kp-list">
+      <li>
+        <span class="icon">🔒</span>
+        <div class="kp-body"><strong>"忙"标志置位时机要最早</strong><br>
+        <code>g_isSampleDone = false</code> 应在任何共享资源操作（SwitchBuffer）之前，才能关闭中断重入窗口。</div>
+      </li>
+      <li>
+        <span class="icon">🗑️</span>
+        <div class="kp-body"><strong>启动采样前先清该路旧 Done 标志</strong><br>
+        防止上一轮残留的 <code>g_isX_Done=true</code> 与本轮新采样的 <code>g_isY_Done=true</code> 发生跨轮误配对。</div>
+      </li>
+      <li>
+        <span class="icon">🚫</span>
+        <div class="kp-body"><strong>禁止在 DMA 传输期间重配目标地址</strong><br>
+        必须先 <code>dma_channel_disable</code> 再修改 <code>memory_addr</code>，否则 DMA 内部指针与配置寄存器不一致。</div>
+      </li>
+    </ul>
+
+    <h3 class="sub">6.4 EXTI 触发沿选择</h3>
+    <table>
+      <tr><th>场景</th><th>建议触发沿</th></tr>
+      <tr><td>只关心信号到来（单向变化）</td><td><code>EXTI_TRIG_RISING</code> 或 <code>FALLING</code></td></tr>
+      <tr><td>A/B 双相位切换（如 PLS_SO）</td><td><strong>必须</strong> <code>EXTI_TRIG_BOTH</code>，否则一路相位永远不触发</td></tr>
+      <tr><td>防抖动要求高</td><td>配合软件防抖或硬件滤波器</td></tr>
+    </table>
+
+    <h3 class="sub">6.5 ISR 中应立即锁存引脚电平</h3>
+    <div class="callout info">
+      <div class="label">💡 原则</div>
+      所有与"触发边沿相关的状态"必须在 ISR 中立即记录。ISR 执行期间引脚电平最接近触发瞬间；
+      主循环中读取时，PLS 可能已跳变（尤其主循环周期远大于信号半周期时）。
+    </div>
+    <pre><span class="c-comment">// 错误：主循环读时电平已变</span>
+<span class="c-keyword">void</span> <span class="c-func">EXTI_Handler</span>(<span class="c-keyword">void</span>) { g_isStartSampling = <span class="c-num">true</span>; }
+<span class="c-keyword">void</span> <span class="c-func">MeasureTask</span>(<span class="c-keyword">void</span>) { state = <span class="c-func">gpio_input_bit_get</span>(...); } <span class="c-comment">// ← 已变！</span>
+
+<span class="c-comment">// 正确：ISR 内立即锁存</span>
+<span class="c-keyword">void</span> <span class="c-func">EXTI_Handler</span>(<span class="c-keyword">void</span>) {
+    g_plsState = <span class="c-func">gpio_input_bit_get</span>(...) ? kHigh : kLow; <span class="c-comment">// ← 最准确</span>
+    g_isStartSampling = <span class="c-num">true</span>;
+}</pre>
+
+    <h3 class="sub">6.6 裸机主循环中 delay 的危害</h3>
+    <ul class="kp-list">
+      <li><span class="icon">⏱️</span>
+        <div class="kp-body"><strong>扩大中断积累窗口</strong>：delay 期间多个 EXTI 连续触发，中间请求丢失，<code>g_isStartSampling</code> 只保留最后一次。</div>
+      </li>
+      <li><span class="icon">🔀</span>
+        <div class="kp-body"><strong>允许 Done 标志跨轮积累</strong>：<code>g_isA_Done</code> 来自本轮，<code>g_isB_Done</code> 来自上轮，两者同时为 true 触发错误配对分析。</div>
+      </li>
+      <li><span class="icon">💥</span>
+        <div class="kp-body"><strong>造成数据竞争</strong>：分析任务读缓冲区时，新 DMA 已经在写同一块内存。</div>
+      </li>
+    </ul>
+    <div class="callout success">
+      <div class="label">✅ 正确做法</div>
+      裸机主循环中不使用阻塞 delay，改用<strong>非阻塞时间片</strong>（SysTick 计数比较）
+      或<strong>状态机节拍</strong>，保持主循环以最快速度轮询事件标志。
+    </div>
+
+    <h3 class="sub">6.7 ADC 采样值的常用滤波方法</h3>
+    <table>
+      <tr><th>方法</th><th>适用场景</th><th>复杂度</th></tr>
+      <tr><td>算术平均</td><td>噪声均匀，无明显毛刺</td><td>低</td></tr>
+      <tr><td>截尾均值（Trimmed Mean）</td><td>有偶发脉冲毛刺 <em>（本项目采用，一级）</em></td><td>低</td></tr>
+      <tr><td>中位数</td><td>毛刺较多，样本量小</td><td>低</td></tr>
+      <tr><td>最密集簇均值</td><td>样本分散但有稳定核心 <em>（本项目二级）</em></td><td>中</td></tr>
+      <tr><td>IIR 低通</td><td>实时流式采样，延迟可接受</td><td>低</td></tr>
+      <tr><td>Kalman 滤波</td><td>高精度，噪声模型已知</td><td>高</td></tr>
+    </table>
+    <p>本项目两级滤波链：</p>
+    <div class="timing-box">ADC 原始 10 点
+  → <span class="c-arrow">截尾均值</span>（去最大最小各1个，求平均）→ V_A / V_B
+  → V_OUT = V_A - V_B，累积 20 组
+  → <span class="c-arrow">聚类窗口8</span>（最密集8个求均值）→ 最终 V_OUT 输出</div>
+
+    <h3 class="sub">6.8 双缓冲设计最佳实践（裸机）</h3>
+    <div class="timing-box"><span class="c-comment">推荐结构：</span>
+  缓冲 A ──────► [分析任务读]
+  缓冲 B ──DMA──► [ADC写入中]
+
+  A 满 → 通知分析任务 → 分析读 A → 同时 DMA 可安全写 B
+  B 满 → 通知分析任务 → 分析读 B → 同时 DMA 可安全写 A
+
+<span class="c-comment">关键约束：</span>
+  1. 分析任务读某缓冲时，DMA 绝对不能写同一缓冲
+  2. 切换缓冲前必须 dma_channel_disable，再改 memory_addr
+  3. 每次切换前清除目标缓冲的"完成"标志（防跨轮误配）
+  4. Enable DMA 前清 ADC EOC 标志（防 [0] 位污染）</div>
+
+  </section>
+
+</div><!-- /container -->
+
+<footer>
+  <div class="container">
+    ADC + DMA 双缓冲采样调试记录 &nbsp;·&nbsp; HP6_BS V1.0.2 &nbsp;·&nbsp; 2026-02-24
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,27 @@
+#include "gd32c2x1.h"
+#include "gd32c231c_eval.h"
+#include "user_uart.h"
+//#include	"ISL700_2A_38VC.H"
+//#include	"CRC_8.H"
+
+/*!
+    \brief      main function
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+int main(void)
+{
+    /* USART interrupt configuration */
+    nvic_irq_enable(USART0_IRQn, 0);
+
+    /* initialize the com */
+    com_usart_init();
+
+    /* enable USART TBE interrupt */
+    usart_interrupt_enable(USART0, USART_INT_TBE);
+
+    while(1) {
+    }
+}
+

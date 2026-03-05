@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flash 参数管理精简版 - 操作指南</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #007AFF;
+            --success: #34C759;
+            --warning: #FF9500;
+            --danger: #FF3B30;
+            --bg: #F5F5F7;
+            --surface: #FFFFFF;
+            --text: #1D1D1D;
+            --text-sec: #86868B;
+            --border: #E5E5EA;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.95;
+            font-weight: 300;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+            font-weight: 500;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        section {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        h2 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid var(--primary);
+            font-size: 1.6rem;
+        }
+
+        h3 {
+            color: var(--text);
+            margin-top: 1.5rem;
+            margin-bottom: 0.8rem;
+            font-size: 1.2rem;
+        }
+
+        .code-block {
+            background: #2D2D30;
+            color: #D4D4D4;
+            padding: 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            margin: 1rem 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1));
+            border-left: 4px solid #667eea;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .feature-card {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 16px rgba(102,126,234,0.2);
+            transform: translateY(-2px);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-title {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-desc {
+            color: var(--text-sec);
+            font-size: 0.95rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.8rem;
+            text-align: left;
+        }
+
+        th {
+            background: var(--bg);
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        tr:hover {
+            background: var(--bg);
+        }
+
+        ul, ol {
+            margin-left: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .tag-simple {
+            background: var(--success);
+            color: white;
+        }
+
+        .tag-safe {
+            background: var(--primary);
+            color: white;
+        }
+
+        .tag-small {
+            background: var(--warning);
+            color: white;
+        }
+
+        .comparison-table {
+            margin: 2rem 0;
+        }
+
+        .comparison-table td:first-child {
+            font-weight: 500;
+        }
+
+        .vs-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-sec);
+            border-top: 1px solid var(--border);
+            margin-top: 2rem;
+        }
+
+        .emoji {
+            font-style: normal;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>⚡ Flash 参数管理 - 精简版</h1>
+        <p class="subtitle">直接存储完整结构体 + A/B 双页掉电保护 + 250 行代码</p>
+        <span class="badge">GD32C231 | 精简设计 | 生产可用</span>
+    </header>
+
+    <div class="container">
+        <!-- 快速导航 -->
+        <section>
+            <h2>📖 快速导航</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <div class="feature-title">设计理念</div>
+                    <div class="feature-desc">为什么选择精简版？A/B 双页 vs 单页？</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🏗️</div>
+                    <div class="feature-title">数据结构</div>
+                    <div class="feature-desc">24 字节记录，8 字节对齐，直接存结构体</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <div class="feature-title">4 个 API</div>
+                    <div class="feature-desc">init / get / set / restore_default</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💻</div>
+                    <div class="feature-title">代码示例</div>
+                    <div class="feature-desc">10 行代码完成初始化、读取、保存</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <div class="feature-title">掉电保护</div>
+                    <div class="feature-desc">任何时刻掉电都能恢复完整数据</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📏</div>
+                    <div class="feature-title">扩展参数</div>
+                    <div class="feature-desc">3 步完成参数新增/删减</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 方案选择 -->
+        <section>
+            <h2>🎯 为什么选择精简版？</h2>
+            
+            <h3>单页 vs A/B 双页对比</h3>
+            <table class="comparison-table">
+                <tr>
+                    <th>方案</th>
+                    <th>代码量</th>
+                    <th>Flash 占用</th>
+                    <th>掉电安全</th>
+                    <th>推荐度</th>
+                </tr>
+                <tr>
+                    <td>单页存储</td>
+                    <td>~200 行</td>
+                    <td>1 KB</td>
+                    <td><span style="color: var(--danger);">❌ 擦除/写入时掉电会丢失</span></td>
+                    <td>⭐⭐</td>
+                </tr>
+                <tr>
+                    <td><strong>A/B 双页</strong> <span class="vs-badge">推荐</span></td>
+                    <td><strong>~250 行</strong></td>
+                    <td><strong>2 KB</strong></td>
+                    <td><strong><span style="color: var(--success);">✅ 任何时刻都有完整备份</span></strong></td>
+                    <td><strong>⭐⭐⭐⭐⭐</strong></td>
+                </tr>
+            </table>
+
+            <div class="highlight-box">
+                <strong>💡 精简版选择理由：</strong><br>
+                <ul style="margin-top: 0.5rem;">
+                    <li>A/B 双页只需 <strong>+50 行代码</strong>，但可靠性提升巨大</li>
+                    <li>直接存储完整结构体，<strong>无需拆分映射</strong></li>
+                    <li>代码量仅 250 行，<strong>比原版减少 70%</strong></li>
+                    <li>保留核心功能：掉电保护 + CRC32 + 出厂恢复</li>
+                </ul>
+            </div>
+
+            <h3>精简版 vs 完整版对比</h3>
+            <table>
+                <tr>
+                    <th>特性</th>
+                    <th>完整版</th>
+                    <th>精简版</th>
+                </tr>
+                <tr>
+                    <td>代码行数</td>
+                    <td>~800 行</td>
+                    <td><strong>~250 行</strong> <span class="tag tag-small">-69%</span></td>
+                </tr>
+                <tr>
+                    <td>API 数量</td>
+                    <td>8 个</td>
+                    <td><strong>4 个</strong> <span class="tag tag-simple">精简</span></td>
+                </tr>
+                <tr>
+                    <td>参数存储</td>
+                    <td>拆分 a/b/c 映射</td>
+                    <td><strong>直接存结构体</strong> <span class="tag tag-simple">直观</span></td>
+                </tr>
+                <tr>
+                    <td>掉电保护</td>
+                    <td>✅ A/B 双页</td>
+                    <td><strong>✅ A/B 双页</strong> <span class="tag tag-safe">保留</span></td>
+                </tr>
+                <tr>
+                    <td>CRC 校验</td>
+                    <td>✅ CRC32</td>
+                    <td><strong>✅ CRC32</strong> <span class="tag tag-safe">保留</span></td>
+                </tr>
+                <tr>
+                    <td>参数验证</td>
+                    <td>✅ 8 项范围检查</td>
+                    <td>❌ 无（精简）</td>
+                </tr>
+                <tr>
+                    <td>版本迁移</td>
+                    <td>✅ 完整框架</td>
+                    <td>❌ 无（注释说明）</td>
+                </tr>
+                <tr>
+                    <td>调试输出</td>
+                    <td>✅ 详细日志</td>
+                    <td>❌ 无</td>
+                </tr>
+            </table>
+        </section>
+
+        <!-- 数据结构 -->
+        <section>
+            <h2>🏗️ 数据结构设计</h2>
+
+            <h3>1. 传感器参数结构体（用户可自定义）</h3>
+            <div class="code-block">typedef struct {
+    uint8_t  pls;                   /* [4:11] 发射脉冲幅值 */
+    uint16_t fine_gain;             /* [14:23] 细调增益 */
+    uint8_t  coarse_gain1;          /* [29:32] 粗调增益1 */
+    uint8_t  work_mode;             /* 工作模式 */
+    uint8_t  sample_rate;           /* 采样率(kHz) */
+    uint16_t threshold_high;        /* 高阈值 */
+    uint16_t threshold_low;         /* 低阈值 */
+} __attribute__((packed)) sensor_param_t;  /* 11 字节 */</div>
+
+            <h3>2. NVM 存储记录（自动补齐到 8 字节倍数）</h3>
+            <div class="code-block">typedef struct {
+    uint32_t magic;                 /* 0x5A5AA55A 魔术字 */
+    uint32_t seq;                   /* 序号，越大越新 */
+    sensor_param_t param;           /* 参数数据 (11 字节) */
+    uint32_t crc32;                 /* CRC 校验 */
+    uint8_t  padding[5];            /* 补齐到 24 字节（8的倍数） */
+} __attribute__((aligned(8))) nvm_record_t;  /* 24 字节 */</div>
+
+            <div class="highlight-box">
+                <strong>⚠️ 重要：</strong> 修改 <code>sensor_param_t</code> 后，必须调整 <code>padding</code> 大小，保证总大小是 8 的倍数！
+                <br><br>
+                <strong>计算公式：</strong><br>
+                总大小 = 4(magic) + 4(seq) + sizeof(param) + 4(crc32) + padding<br>
+                确保：(总大小 % 8) == 0
+            </div>
+
+            <h3>3. Flash 分区布局</h3>
+            <table>
+                <tr>
+                    <th>页号</th>
+                    <th>地址</th>
+                    <th>大小</th>
+                    <th>用途</th>
+                </tr>
+                <tr>
+                    <td>0 ~ 61</td>
+                    <td>0x08000000 ~ 0x0800F7FF</td>
+                    <td>62 KB</td>
+                    <td>应用程序代码</td>
+                </tr>
+                <tr style="background: rgba(102,126,234,0.1);">
+                    <td><strong>62 (A 页)</strong></td>
+                    <td><strong>0x0800F800</strong></td>
+                    <td><strong>1 KB</strong></td>
+                    <td><strong>NVM 参数存储 A</strong></td>
+                </tr>
+                <tr style="background: rgba(118,75,162,0.1);">
+                    <td><strong>63 (B 页)</strong></td>
+                    <td><strong>0x0800FC00</strong></td>
+                    <td><strong>1 KB</strong></td>
+                    <td><strong>NVM 参数存储 B</strong></td>
+                </tr>
+            </table>
+        </section>
+
+        <!-- API 使用 -->
+        <section>
+            <h2>🚀 API 使用说明</h2>
+
+            <h3>4 个精简 API</h3>
+            <table>
+                <tr>
+                    <th style="width: 35%;">函数</th>
+                    <th>功能说明</th>
+                    <th style="width: 15%;">返回值</th>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_init()</code></td>
+                    <td>初始化模块，上电加载 Flash，若无效则使用出厂默认值并写入</td>
+                    <td>0: 成功<br>-1: 失败</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_get(param)</code></td>
+                    <td>读取当前参数到 <code>param</code></td>
+                    <td>0: 成功<br>-1: 失败</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_set(param)</code></td>
+                    <td>保存参数到 Flash（使用 A/B 双页备份）</td>
+                    <td>0: 成功<br>-1: 失败</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_restore_default()</code></td>
+                    <td>恢复出厂默认值并写入 Flash</td>
+                    <td>0: 成功<br>-1: 失败</td>
+                </tr>
+            </table>
+
+            <h3>完整使用示例</h3>
+            <div class="code-block">#include "nvm_param_simple.h"
+
+int main(void)
+{
+    sensor_param_t param;
+    
+    /* ===== 步骤 1: 初始化（上电加载） ===== */
+    if (nvm_param_init() == 0) {
+        printf("参数模块初始化成功\n");
+    }
+    
+    /* ===== 步骤 2: 读取当前参数 ===== */
+    nvm_param_get(&param);
+    printf("pls=%u, fine_gain=%u, sample_rate=%u kHz\n",
+           param.pls, param.fine_gain, param.sample_rate);
+    
+    /* ===== 步骤 3: 修改参数并保存 ===== */
+    param.pls = 9;
+    param.fine_gain = 600;
+    param.sample_rate = 125;
+    
+    if (nvm_param_set(&param) == 0) {
+        printf("参数保存成功\n");
+    }
+    
+    /* ===== 步骤 4: 验证保存结果 ===== */
+    nvm_param_get(&param);
+    printf("验证: pls=%u, fine_gain=%u\n", param.pls, param.fine_gain);
+    
+    /* ===== 步骤 5: 恢复出厂默认（可选） ===== */
+    // nvm_param_restore_default();
+    
+    while(1) {
+        /* 主循环 */
+    }
+}</div>
+        </section>
+
+        <!-- 掉电保护原理 -->
+        <section>
+            <h2>🛡️ 掉电保护原理</h2>
+
+            <h3>A/B 双页写入流程</h3>
+            <div class="code-block">初始状态：
+  A 页：seq=10, 有效
+  B 页：seq=9,  有效
+
+写入新数据：
+  1. 读取 A/B 页，比较 seq
+  2. 识别 B 页是旧页（seq=9）
+  3. 擦除 B 页
+  4. 更新 seq=11，计算 CRC32
+  5. 写入 B 页
+
+结果状态：
+  A 页：seq=10, 有效（备份）
+  B 页：seq=11, 有效（最新）</div>
+
+            <h3>掉电场景分析</h3>
+            <table>
+                <tr>
+                    <th>掉电时刻</th>
+                    <th>A 页状态</th>
+                    <th>B 页状态</th>
+                    <th>恢复策略</th>
+                </tr>
+                <tr>
+                    <td>擦除前</td>
+                    <td>✅ 有效 (seq=10)</td>
+                    <td>✅ 有效 (seq=9)</td>
+                    <td>加载 A 页（seq 更大）</td>
+                </tr>
+                <tr>
+                    <td>擦除中</td>
+                    <td>✅ 有效 (seq=10)</td>
+                    <td>❌ 已擦除</td>
+                    <td>加载 A 页（唯一有效）</td>
+                </tr>
+                <tr>
+                    <td>写入中</td>
+                    <td>✅ 有效 (seq=10)</td>
+                    <td>⚠️ 部分写入</td>
+                    <td>B 页 CRC 失败，加载 A 页</td>
+                </tr>
+                <tr>
+                    <td>写入后</td>
+                    <td>✅ 有效 (seq=10)</td>
+                    <td>✅ 有效 (seq=11)</td>
+                    <td>加载 B 页（seq 更大）</td>
+                </tr>
+            </table>
+
+            <div class="highlight-box">
+                <strong>🎯 核心保证：</strong> 任何时刻掉电，至少有一页完整有效的数据可用！
+                <br><br>
+                <strong>判断逻辑：</strong><br>
+                1. 检查 magic 是否为 0x5A5AA55A<br>
+                2. 验证 CRC32 是否正确<br>
+                3. 选择 seq 较大且有效的页<br>
+                4. 若两页都有效，选 seq 大的；若只有一页有效，选该页
+            </div>
+        </section>
+
+        <!-- 扩展参数 -->
+        <section>
+            <h2>📏 如何新增/修改参数</h2>
+
+            <h3>3 步完成参数扩展</h3>
+            
+            <h4>步骤 1：修改 sensor_param_t 结构体</h4>
+            <div class="code-block">/* 在 nvm_param_simple.h 中 */
+typedef struct {
+    uint8_t  pls;
+    uint16_t fine_gain;
+    uint8_t  coarse_gain1;
+    uint8_t  work_mode;
+    uint8_t  sample_rate;
+    uint16_t threshold_high;
+    uint16_t threshold_low;
+    
+    /* 新增字段 */
+    uint8_t  new_field1;        /* 新参数 1 */
+    uint16_t new_field2;        /* 新参数 2 */
+    
+} sensor_param_t;  /* 现在是 14 字节 */</div>
+
+            <h4>步骤 2：调整 nvm_record_t 的 padding</h4>
+            <div class="code-block">/* 计算总大小 */
+总大小 = 4(magic) + 4(seq) + 14(param) + 4(crc32) = 26 字节
+
+/* 补齐到 8 的倍数：32 字节 */
+需要 padding = 32 - 26 = 6 字节
+
+/* 修改结构体 */
+typedef struct {
+    uint32_t magic;
+    uint32_t seq;
+    sensor_param_t param;       /* 14 字节 */
+    uint32_t crc32;
+    uint8_t  padding[6];        /* 改为 6 字节 */
+} nvm_record_t;  /* 32 字节，8 的倍数 ✓ */</div>
+
+            <h4>步骤 3：更新出厂默认值</h4>
+            <div class="code-block">/* 在 nvm_param_simple.c 中 */
+const sensor_param_t FACTORY_DEFAULT = {
+    .pls             = 8,
+    .fine_gain       = 512,
+    .coarse_gain1    = 8,
+    .work_mode       = 0,
+    .sample_rate     = 100,
+    .threshold_high  = 50000,
+    .threshold_low   = 10000,
+    
+    /* 新字段的默认值 */
+    .new_field1      = 0,
+    .new_field2      = 100,
+};</div>
+
+            <div class="highlight-box">
+                <strong>⚠️ 注意事项：</strong><br>
+                1. 修改参数后，旧的 Flash 数据会因为大小不匹配而失效<br>
+                2. 首次烧录新固件时，会自动使用出厂默认值<br>
+                3. 如需保留旧数据，需手动实现版本迁移逻辑
+            </div>
+        </section>
+
+        <!-- 8 字节对齐 -->
+        <section>
+            <h2>📐 8 字节对齐处理</h2>
+
+            <h3>为什么需要 8 字节对齐？</h3>
+            <p>GD32C231 Flash 写入约束：</p>
+            <ul>
+                <li>必须按 <strong>8 字节（doubleword）</strong>为单位写入</li>
+                <li>写入地址必须 <strong>8 字节对齐</strong></li>
+                <li>不足 8 字节的部分自动补 <code>0xFF</code></li>
+            </ul>
+
+            <h3>自动对齐实现</h3>
+            <div class="code-block">/* flash_write_buffer() 自动处理对齐 */
+
+/* 1. 检查地址对齐 */
+if (addr % 8 != 0) {
+    return -1;  /* 地址必须 8 字节对齐 */
+}
+
+/* 2. 每次处理 8 字节 */
+while (offset < len) {
+    uint8_t temp[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    uint32_t copy_len = (len - offset >= 8) ? 8 : (len - offset);
+    
+    /* 3. 拷贝实际数据，剩余部分保持 0xFF */
+    memcpy(temp, data + offset, copy_len);
+    
+    /* 4. 手动组装 64 位数据（避免未对齐访问） */
+    uint64_t doubleword = ((uint64_t)temp[0] << 0)  | ((uint64_t)temp[1] << 8)  |
+                          ((uint64_t)temp[2] << 16) | ((uint64_t)temp[3] << 24) |
+                          ((uint64_t)temp[4] << 32) | ((uint64_t)temp[5] << 40) |
+                          ((uint64_t)temp[6] << 48) | ((uint64_t)temp[7] << 56);
+    
+    /* 5. 写入 Flash */
+    fmc_doubleword_program(addr + offset, doubleword);
+    
+    offset += 8;
+}</div>
+
+            <h3>示例：写入 24 字节记录</h3>
+            <table>
+                <tr>
+                    <th>字节范围</th>
+                    <th>内容</th>
+                    <th>操作</th>
+                </tr>
+                <tr>
+                    <td>0~7</td>
+                    <td>magic + seq (前 4 字节)</td>
+                    <td>第 1 次写入（8 字节）</td>
+                </tr>
+                <tr>
+                    <td>8~15</td>
+                    <td>seq (后 4 字节) + param (前 4 字节)</td>
+                    <td>第 2 次写入（8 字节）</td>
+                </tr>
+                <tr>
+                    <td>16~23</td>
+                    <td>param (剩余 7 字节) + crc32 (1 字节)</td>
+                    <td>第 3 次写入（8 字节）</td>
+                </tr>
+            </table>
+        </section>
+
+        <!-- 文件清单 -->
+        <section>
+            <h2>📦 文件清单与集成</h2>
+
+            <h3>精简版文件列表</h3>
+            <table>
+                <tr>
+                    <th>文件</th>
+                    <th>路径</th>
+                    <th>行数</th>
+                    <th>说明</th>
+                </tr>
+                <tr>
+                    <td><code>bsp_flash_simple.h</code></td>
+                    <td>BSP/inc/</td>
+                    <td>~70</td>
+                    <td>Flash 底层驱动头文件</td>
+                </tr>
+                <tr>
+                    <td><code>bsp_flash_simple.c</code></td>
+                    <td>BSP/src/</td>
+                    <td>~160</td>
+                    <td>Flash 底层驱动实现</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_simple.h</code></td>
+                    <td>BSP/inc/</td>
+                    <td>~70</td>
+                    <td>参数管理头文件</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_simple.c</code></td>
+                    <td>BSP/src/</td>
+                    <td>~140</td>
+                    <td>参数管理实现</td>
+                </tr>
+            </table>
+
+            <h3>集成到项目的 5 个步骤</h3>
+            <ol>
+                <li><strong>复制文件</strong>：将 4 个文件复制到项目的 BSP 目录</li>
+                <li><strong>添加到工程</strong>：在 Keil/IAR 中添加 .c 文件到编译列表</li>
+                <li><strong>包含头文件</strong>：在 main.c 中 <code>#include "nvm_param_simple.h"</code></li>
+                <li><strong>调整参数</strong>：根据实际需求修改 <code>sensor_param_t</code> 和 <code>FACTORY_DEFAULT</code></li>
+                <li><strong>调用 API</strong>：在 main 函数中依次调用 init/get/set 等函数</li>
+            </ol>
+
+            <h3>Keil 工程配置示例</h3>
+            <div class="code-block">/* 1. 添加源文件到工程 */
+BSP/bsp_flash_simple.c
+BSP/nvm_param_simple.c
+
+/* 2. 添加头文件路径 */
+C/C++ → Include Paths:
+  .\BSP\inc
+
+/* 3. 确保链接了 FMC 库 */
+Firmware/GD32C2x1_standard_peripheral/Source/gd32c2x1_fmc.c</div>
+        </section>
+
+        <!-- 常见问题 -->
+        <section>
+            <h2>❓ 常见问题 FAQ</h2>
+
+            <h3>Q1: 为什么推荐 A/B 双页而不是单页？</h3>
+            <p><strong>A:</strong> A/B 双页只增加 50 行代码和 1KB Flash，但可靠性提升巨大。单页方案在擦除/写入过程中掉电会导致数据完全丢失，而双页方案任何时刻都有至少一份完整数据。</p>
+
+            <h3>Q2: Flash 擦写次数有限制吗？</h3>
+            <p><strong>A:</strong> GD32C231 Flash 典型擦写次数为 10 万次。建议：</p>
+            <ul>
+                <li>不要过于频繁保存参数（如每秒保存）</li>
+                <li>参数变化时才保存，避免无谓写入</li>
+                <li>正常使用场景下，10 万次足够使用数十年</li>
+            </ul>
+
+            <h3>Q3: 如何判断 Flash 数据是否有效？</h3>
+            <p><strong>A:</strong> 三重检查机制：</p>
+            <ol>
+                <li><strong>Magic 检查</strong>：验证 magic 是否为 0x5A5AA55A</li>
+                <li><strong>CRC32 校验</strong>：验证数据完整性</li>
+                <li><strong>Seq 比较</strong>：选择序号较大的有效页</li>
+            </ol>
+
+            <h3>Q4: 修改参数后如何保留旧数据？</h3>
+            <p><strong>A:</strong> 精简版不支持自动版本迁移。如需保留旧数据：</p>
+            <ol>
+                <li>在初始化时读取旧数据</li>
+                <li>手动提取需要的字段</li>
+                <li>填充到新结构体并保存</li>
+            </ol>
+
+            <h3>Q5: 如何调试 Flash 读写问题？</h3>
+            <p><strong>A:</strong> 调试技巧：</p>
+            <ul>
+                <li>使用 J-Link 读取 Flash 地址 0x0800F800 和 0x0800FC00</li>
+                <li>检查 magic 是否为 0x5A5AA55A</li>
+                <li>检查 seq 的值是否递增</li>
+                <li>计算 CRC32 并与保存的值对比</li>
+            </ul>
+
+            <h3>Q6: 能否支持更多参数？</h3>
+            <p><strong>A:</strong> 可以，只要总大小不超过 1KB（页面大小）。建议：</p>
+            <ul>
+                <li>单条记录控制在 256 字节以内</li>
+                <li>使用 packed 属性减少结构体大小</li>
+                <li>确保总大小是 8 的倍数</li>
+            </ul>
+        </section>
+
+        <!-- 最佳实践 -->
+        <section>
+            <h2>💡 最佳实践建议</h2>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <div class="feature-title">初始化时机</div>
+                    <div class="feature-desc">在 main 函数开始处尽早调用 nvm_param_init()</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💾</div>
+                    <div class="feature-title">保存频率</div>
+                    <div class="feature-desc">参数变化时才保存，避免频繁写入 Flash</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <div class="feature-title">错误检查</div>
+                    <div class="feature-desc">每次调用 API 后检查返回值，确保操作成功</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📏</div>
+                    <div class="feature-title">结构体对齐</div>
+                    <div class="feature-desc">修改参数后务必调整 padding 保证 8 字节对齐</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <div class="feature-title">默认值设置</div>
+                    <div class="feature-desc">FACTORY_DEFAULT 应设置为最稳定的配置</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🧪</div>
+                    <div class="feature-title">掉电测试</div>
+                    <div class="feature-desc">开发阶段应测试写入过程中断电的恢复情况</div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        <p><strong>Flash 参数管理精简版</strong> | 设计基于 GD32C231 | 250 行代码 | A/B 双页掉电保护</p>
+        <p style="margin-top: 0.5rem; font-size: 0.9rem;">版本 1.0（精简版）| 2026 年 2 月</p>
+    </footer>
+</body>
+</html>

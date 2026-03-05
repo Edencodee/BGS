@@ -1,0 +1,44 @@
+./output/task_pd.o: ..\task_PD.c ..\main.h \
+  ..\..\Utilities\gd32c231c_eval.h \
+  ..\..\Firmware\CMSIS\GD\GD32C2x1\Include\gd32c2x1.h \
+  D:\programs\Keil_v5\Packs\ARM\CMSIS\6.1.0\CMSIS\Core\Include\core_cm23.h \
+  D:\programs\Keil_v5\ARM\ARMCLANG\include\stdint.h \
+  D:\programs\Keil_v5\Packs\ARM\CMSIS\6.1.0\CMSIS\Core\Include\cmsis_version.h \
+  D:\programs\Keil_v5\Packs\ARM\CMSIS\6.1.0\CMSIS\Core\Include\cmsis_compiler.h \
+  D:\programs\Keil_v5\Packs\ARM\CMSIS\6.1.0\CMSIS\Core\Include\cmsis_armclang.h \
+  D:\programs\Keil_v5\ARM\ARMCLANG\include\arm_acle.h \
+  D:\programs\Keil_v5\Packs\ARM\CMSIS\6.1.0\CMSIS\Core\Include\m-profile\cmsis_armclang_m.h \
+  ..\..\Firmware\CMSIS\GD\GD32C2x1\Include\system_gd32c2x1.h \
+  ..\gd32c2x1_libopt.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_adc.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_cmp.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_crc.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_dbg.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_dma.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_exti.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_fmc.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_fwdgt.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_gpio.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_i2c.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_misc.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_pmu.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_rcu.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_rtc.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_spi.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_syscfg.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_timer.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_usart.h \
+  ..\..\Firmware\GD32C2x1_standard_peripheral\Include\gd32c2x1_wwdgt.h \
+  ..\..\Firmware\CMSIS\GD\GD32C2x1\Include\gd32c2x1_err_report.h \
+  D:\programs\Keil_v5\ARM\ARMCLANG\include\stdio.h \
+  ..\..\RTT\SEGGER_RTT.h ..\..\RTT\SEGGER_RTT_Conf.h \
+  D:\programs\Keil_v5\ARM\ARMCLANG\include\stdlib.h \
+  D:\programs\Keil_v5\ARM\ARMCLANG\include\stdarg.h ..\systick.h \
+  ..\..\Utilities\inc\user_adc.h ..\..\Utilities\inc\user_gpio.h \
+  D:\programs\Keil_v5\ARM\ARMCLANG\include\stdbool.h \
+  ..\..\Utilities\inc\user_timer.h ..\..\Utilities\inc\user_flash.h \
+  ..\..\Utilities\inc\user_uart.h ..\..\Utilities\inc\wtdint.h \
+  D:\programs\Keil_v5\ARM\ARMCLANG\include\math.h ..\task.h ..\task_PD.h \
+  ..\task_flash.h ..\task_output.h ..\task_short.h ..\task_led.h \
+  ..\filter.h ..\..\ISL700_2A_38VC_Fuse\ISL700_2A_38VC.h \
+  ..\..\ISL700_2A_38VC_Fuse\CRC_8.h

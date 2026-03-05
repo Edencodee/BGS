@@ -1,0 +1,397 @@
+#include "main.h"
+
+#define PAPA_ADDR_MIN 0x0064
+#define PARA_ADDR_MAX (PAPA_ADDR_MIN + 2 * PN)
+#define GB 1
+uint8_t g_ackBuf[16] = {0};
+
+const uint8_t auchCRCHi[] = {
+	0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81,
+	0x40, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0,
+	0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01,
+	0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41,
+	0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81,
+	0x40, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0,
+	0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01,
+	0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40,
+	0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81,
+	0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0,
+	0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01,
+	0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41,
+	0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81,
+	0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0,
+	0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01,
+	0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41,
+	0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81,
+	0x40
+};
+
+const uint8_t auchCRCLo[] = {
+	0x00, 0xC0, 0xC1, 0x01, 0xC3, 0x03, 0x02, 0xC2, 0xC6, 0x06, 0x07, 0xC7, 0x05, 0xC5, 0xC4,
+	0x04, 0xCC, 0x0C, 0x0D, 0xCD, 0x0F, 0xCF, 0xCE, 0x0E, 0x0A, 0xCA, 0xCB, 0x0B, 0xC9, 0x09,
+	0x08, 0xC8, 0xD8, 0x18, 0x19, 0xD9, 0x1B, 0xDB, 0xDA, 0x1A, 0x1E, 0xDE, 0xDF, 0x1F, 0xDD,
+	0x1D, 0x1C, 0xDC, 0x14, 0xD4, 0xD5, 0x15, 0xD7, 0x17, 0x16, 0xD6, 0xD2, 0x12, 0x13, 0xD3,
+	0x11, 0xD1, 0xD0, 0x10, 0xF0, 0x30, 0x31, 0xF1, 0x33, 0xF3, 0xF2, 0x32, 0x36, 0xF6, 0xF7,
+	0x37, 0xF5, 0x35, 0x34, 0xF4, 0x3C, 0xFC, 0xFD, 0x3D, 0xFF, 0x3F, 0x3E, 0xFE, 0xFA, 0x3A,
+	0x3B, 0xFB, 0x39, 0xF9, 0xF8, 0x38, 0x28, 0xE8, 0xE9, 0x29, 0xEB, 0x2B, 0x2A, 0xEA, 0xEE,
+	0x2E, 0x2F, 0xEF, 0x2D, 0xED, 0xEC, 0x2C, 0xE4, 0x24, 0x25, 0xE5, 0x27, 0xE7, 0xE6, 0x26,
+	0x22, 0xE2, 0xE3, 0x23, 0xE1, 0x21, 0x20, 0xE0, 0xA0, 0x60, 0x61, 0xA1, 0x63, 0xA3, 0xA2,
+	0x62, 0x66, 0xA6, 0xA7, 0x67, 0xA5, 0x65, 0x64, 0xA4, 0x6C, 0xAC, 0xAD, 0x6D, 0xAF, 0x6F,
+	0x6E, 0xAE, 0xAA, 0x6A, 0x6B, 0xAB, 0x69, 0xA9, 0xA8, 0x68, 0x78, 0xB8, 0xB9, 0x79, 0xBB,
+	0x7B, 0x7A, 0xBA, 0xBE, 0x7E, 0x7F, 0xBF, 0x7D, 0xBD, 0xBC, 0x7C, 0xB4, 0x74, 0x75, 0xB5,
+	0x77, 0xB7, 0xB6, 0x76, 0x72, 0xB2, 0xB3, 0x73, 0xB1, 0x71, 0x70, 0xB0, 0x50, 0x90, 0x91,
+	0x51, 0x93, 0x53, 0x52, 0x92, 0x96, 0x56, 0x57, 0x97, 0x55, 0x95, 0x94, 0x54, 0x9C, 0x5C,
+	0x5D, 0x9D, 0x5F, 0x9F, 0x9E, 0x5E, 0x5A, 0x9A, 0x9B, 0x5B, 0x99, 0x59, 0x58, 0x98, 0x88,
+	0x48, 0x49, 0x89, 0x4B, 0x8B, 0x8A, 0x4A, 0x4E, 0x8E, 0x8F, 0x4F, 0x8D, 0x4D, 0x4C, 0x8C,
+	0x44, 0x84, 0x85, 0x45, 0x87, 0x47, 0x46, 0x86, 0x82, 0x42, 0x43, 0x83, 0x41, 0x81, 0x80,
+	0x40
+};
+
+static uint16_t MODBUS_CRC16 (uint8_t *msg, uint16_t len)
+{
+	uint8_t uchCRCHi = 0xFF;
+	uint8_t uchCRCLo = 0xFF;
+	unsigned uIndex;
+
+	while (len--) {
+		uIndex   = uchCRCLo ^ *msg++;
+		uchCRCLo = uchCRCHi ^ auchCRCHi[uIndex];
+		uchCRCHi = auchCRCLo[uIndex];
+	}
+	return (uchCRCHi << 8 | uchCRCLo);
+}
+
+#if !GB
+typedef struct {
+	uint16_t index;
+	uint16_t n;
+} modbus_reg_t;
+
+#define REMAP04_N	16
+//#define REG04_N 	21
+const modbus_reg_t regRemap04[REMAP04_N] = {
+	{kRegDistDsp,	2}, // {kRegDist10,	2},
+	{kRegMod,		1},
+	{kRegNONC1,		1},
+//	{kRegNONC2,		1},
+	{kRegOut,		1},
+	{kRegDiff,		2},
+	{kRegNPN,		1},
+	{kRegDly,		1},
+	{kRegDlyT,		1},
+	{kRegDsp,		1},
+	{kRegKeep,		1},
+	{kRegScreen,	1},
+	{kRegOffs,		2},
+	{kRegQ1Thr1,	2},
+	{kRegQ1Thr2,	2},
+//	{kRegQ2Thr1,	2},
+//	{kRegQ2Thr2,	2},
+	{kRegBps,		2},
+	{kRegTolerance,	2},
+};
+
+#define REMAP10_N	17
+//#define REG10_N 	21
+const modbus_reg_t regRemap10[REMAP10_N] = {
+	{kRegContinue,	1},
+	{kRegMod,		1},
+	{kRegNONC1,		1},
+//	{kRegNONC2,		1},
+	{kRegOut,		1},
+	{kRegDiff,		2},
+	{kRegNPN,		1},
+	{kRegDly,		1},
+	{kRegDlyT,		1},
+	{kRegDsp,		1},
+	{kRegKeep,		1},
+	{kRegScreen,	1},
+	{kRegZero,		1},
+	{kRegQ1Thr1,	2},
+	{kRegQ1Thr2,	2},
+//	{kRegQ2Thr1,	2},
+//	{kRegQ2Thr2,	2},
+	{kRegBps,		2},
+	{kRegReset,		1},
+	{kRegTolerance,	2},
+};
+#else
+typedef struct {
+	uint16_t addr;
+	uint16_t index;
+	uint16_t n;
+} modbus_reg_t;
+
+#define REMAP04_N	21
+//#define REG04_N 	27
+const modbus_reg_t regRemap04[REMAP04_N] = {
+	{0,  kRegDistDsp,	2},		// kRegDisp10
+	{2,  kRegMod,		1},
+	{3,  kRegNPN,       1},
+	{4,  kRegNONC1,		1},
+	{5,  kRegNONC2,		1},
+	{6,  kRegOut,		1},
+	{7,  kRegDiff,		2},
+	{9,  kRegIn,		1},
+	{10, kRegDly,		1},
+	{11, kRegDlyT,		1},
+	{12, kRegDsp,		1},
+	{13, kRegKeep,		1},
+	{14, kRegScreen,	1},
+	{15, kRegOffs,		2},
+	{17, kRegQ1Thr1,	2},
+	{19, kRegQ1Thr2,	2},
+	{21, kRegQ2Thr1,	2},
+	{23, kRegQ2Thr2,	2},
+	{25, kRegBps,		2},
+	{27, kRegAddr,		1},
+	{28, kRegTolerance,	2},
+};
+
+#define REMAP10_N	21
+//#define REG10_N 	27
+const modbus_reg_t regRemap10[REMAP10_N] = {
+	{0,  kRegContinue,	1},
+	{1,  kRegReset,		1},
+	{2,  kRegMod,		1},
+	{3,  kRegNPN,       1},
+	{4,  kRegNONC1,		1},
+	{5,  kRegNONC2,		1},
+	{6,  kRegOut,		1},
+	{7,  kRegDiff,		2},
+	{9,  kRegIn,		1},
+	{10, kRegDly,		1},
+	{11, kRegDlyT,		1},
+	{12, kRegDsp,		1},
+	{13, kRegKeep,		1},
+	{14, kRegScreen,	1},
+	{15, kRegZero,		2},
+	{17, kRegQ1Thr1,	2},
+	{19, kRegQ1Thr2,	2},
+	{21, kRegQ2Thr1,	2},
+	{23, kRegQ2Thr2,	2},
+	{25, kRegBps,		2},
+	{27, kRegTolerance,	2},
+};
+#endif
+static void MODBUS_AckErr (uint8_t err, uint8_t exp)
+{
+	uint8_t *ack = g_ackBuf;
+	ack[0] = g_reg[kRegAddr];
+	ack[1] = err;
+	ack[2] = exp;
+	u16_t crc16 = {.word = MODBUS_CRC16(ack, 3)};
+	ack[3] = crc16.buf[kMsb];
+	ack[4] = crc16.buf[kLsb];
+	UART_DMA_SendData(ack, 5);
+}
+#if GB
+static int32_t chkAddrNum04 (uint16_t addr, uint16_t num, int* index)
+{
+	for (int i = 0; i < REMAP04_N; i++) {
+		if (regRemap04[i].addr == addr) {
+			if (regRemap04[i].n == num) {
+				*index = i;
+				return 0;
+			}
+		}
+	}
+	return -1;
+}
+#endif
+static void MODBUS_ReadInputRegs (uint8_t* msg)
+{
+	u16_t uaddr = {.buf = {msg[3], msg[2]}};
+	uint16_t addr = uaddr.word;
+
+	u16_t uRegN = {.buf = {msg[5], msg[4]}};
+	uint16_t regN = uRegN.word;
+
+	int regIdx;
+
+	if ((regN > 0x7D) || (regN < 1)) {
+		MODBUS_AckErr(0x04, 0x03);
+	}
+#if GB
+	else if (chkAddrNum04(addr, regN, &regIdx) < 0)
+#else
+	else if ((addr >= REMAP04_N) || (regN != regRemap04[addr].n))
+#endif
+	{
+		MODBUS_AckErr(0x04, 0x02);
+	} else {
+		uint8_t *ack = g_ackBuf;
+		ack[0] = g_reg[kRegAddr];
+		ack[1] = 0x04;
+		ack[2] = regN << 1;
+
+		uint8_t *p = ack + 3;
+		int i = 0;
+#if GB
+		int index = regRemap04[regIdx].index;
+		while (i < ack[2]) {
+			u16_t reg = {.word = g_reg[index++]};
+			p[ack[2] - i - 2] = reg.buf[kMsb];
+			p[ack[2] - i - 1] = reg.buf[kLsb];
+			i += 2;
+		}
+#else
+		int index = regRemap04[addr].index + regN - 1;
+		if (addr == 2) {
+			index += g_reg[kRegNPN]; // select 1/2
+		}
+		while (i < ack[2]) {
+			u16_t reg = {.word = g_reg[index--]};
+			p[i] = reg.buf[kMsb];
+			p[i + 1] = reg.buf[kLsb];
+			i += 2;
+		}
+#endif
+		u16_t crc = {.word = MODBUS_CRC16(ack, i + 3)};
+		p[i] = crc.buf[kLsb];
+		p[i + 1] = crc.buf[kMsb];
+
+		UART_DMA_SendData(ack, i + 5);
+	}
+}
+
+void MODBUS_ContiuneOut (void)
+{
+	uint8_t *ack = g_ackBuf;
+	ack[0] = g_reg[kRegAddr];
+	ack[1] = 0x04;
+	ack[2] = 0x04;
+
+	uint8_t *p = ack + 3;
+	int i = 0;
+	int index = regRemap04[0].index;
+	while (i < ack[2]) {
+		u16_t reg = {.word = g_reg[index++]}; // addr 0 -> dist
+		p[i] = reg.buf[kMsb];
+		p[i + 1] = reg.buf[kLsb];
+		i += 2;
+	}
+
+	u16_t crc = {.word = MODBUS_CRC16(ack, i + 3)};
+	p[i] = crc.buf[kLsb];
+	p[i + 1] = crc.buf[kMsb];
+
+	UART_DMA_SendData(ack, i + 5);
+}
+#if GB
+static int32_t chkAddrNum10 (uint16_t addr, uint16_t num, int* index)
+{
+	for (int i = 0; i < REMAP10_N; i++) {
+		if (regRemap10[i].addr == addr) {
+			if (regRemap10[i].n == num) {
+				*index = i;
+				return 0;
+			}
+		}
+	}
+	return -1;
+}
+#endif
+static void MODBUS_Ack (uint8_t* msg)
+{
+	uint8_t *ack = g_ackBuf;
+	memcpy(ack, msg, 6);
+	u16_t crc = {.word = MODBUS_CRC16(ack, 6)};
+	ack[6] = crc.buf[kLsb];
+	ack[7] = crc.buf[kMsb];
+	UART_DMA_SendData(ack, 8);
+}
+
+static void MODBUS_PresetMulRegs (uint8_t* msg)
+{
+	u16_t uaddr = {.buf = {msg[3], msg[2]}};
+	uint16_t addr = uaddr.word;
+
+	u16_t uRegN = {.buf = {msg[5], msg[4]}};
+	uint16_t regN = uRegN.word;
+	uint8_t byteN = msg[6];
+
+	int regIdx;
+
+	if ((regN > 0x7B) || (regN < 1)) {
+		MODBUS_AckErr(0x10, 0x03);
+	} else if ((addr >= PAPA_ADDR_MIN) && (addr <= PARA_ADDR_MAX)) {
+		int n = (addr - PAPA_ADDR_MIN) / 2;
+		if (n < PN) {
+			// record ys[n]
+			u32_t uy = {.buf = {msg[10], msg[9], msg[8], msg[7]}};
+			g_spara.ys[n] = uy.word;
+		}
+		g_spara.currIdx = n;
+		SetFlag(kFlagWritePara);/* n >= PN means calculate */
+
+		MODBUS_Ack (msg);
+
+	} else if (addr == 0x1000) {
+		(*(u32_t*)&g_spara.flag).buf[0] = msg[10]; // sensor type
+		g_spara.currIdx = PN;
+		SetFlag(kFlagWritePara);
+	}
+#if GB
+	else if (chkAddrNum10(addr, regN, &regIdx) < 0)
+#else
+	else if ((addr >= REMAP10_N) || (regN != regRemap10[addr].n))
+#endif
+	{
+		MODBUS_AckErr(0x10, 0x02);
+	} else {
+		uint8_t *p = msg + 7;
+#if GB
+		uint8_t *reg = (uint8_t*)(g_reg + regRemap10[regIdx].index);
+		for (int i = 0; i < byteN; i += 2) {
+			reg[byteN - i - 2] = p[i + 1];
+			reg[byteN - i - 1] = p[i];
+		}
+#else
+		uint8_t *reg = (uint8_t*)(g_reg + regRemap10[addr].index + regN - 1);
+		if (addr == 2) {
+			reg += g_reg[kRegNPN] * 2; // select 1/2
+		}
+		for (int i = 0; i < byteN; i += 2) {
+			reg[0] = p[i + 1];
+			reg[1] = p[i];
+			reg -= 2;
+		}
+#endif
+		SetFlag(kFlagWriteReg);
+		MODBUS_Ack (msg);
+	}
+}
+
+#define FUN_N	2
+const uint8_t supportFunc[FUN_N] = {0x04, 0x10};
+typedef void (*modbus_func_t)(uint8_t* msg);
+const modbus_func_t modbusFuncs[FUN_N] = {
+	MODBUS_ReadInputRegs,
+	MODBUS_PresetMulRegs
+};
+
+void MODBUS_RecvHandler (uint8_t* msg, uint16_t len)
+{
+	if (len < 4) {
+		return;
+	}
+
+	if (0 != MODBUS_CRC16(msg, len)) {
+		return;
+	}
+
+	if (msg[0] != g_reg[kRegAddr]) {
+		return;
+	}
+
+	for (int i = 0; i < FUN_N; i++) {
+		if (msg[1] == supportFunc[i]) {
+			modbusFuncs[i](msg);
+
+			return;
+		}
+	}
+
+	MODBUS_AckErr(0x10, 0x10);
+}

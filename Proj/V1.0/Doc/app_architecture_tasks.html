@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>BGS 应用层框架与任务设计（V1 / CNT 边沿分拣版）</title>
+  <style>
+    :root{
+      --text:#111;
+      --muted:#555;
+      --line:#e5e7eb;
+      --bg:#ffffff;
+      --card:#fbfbfc;
+      --accent:#0b5fff;
+      --good:#047857;
+      --warn:#b45309;
+      --bad:#b91c1c;
+      --codebg:#f6f8fa;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font: 14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif;
+    }
+    .page{max-width:1100px;margin:0 auto;padding:28px 22px 60px}
+    header{border-bottom:2px solid var(--line);padding-bottom:12px;margin-bottom:18px}
+    h1{margin:0 0 6px 0;font-size:22px;line-height:1.25}
+    .meta{color:var(--muted);font-size:12.5px}
+    .grid{display:grid;gap:14px}
+    @media(min-width:980px){ .grid.cols2{grid-template-columns:1fr 1fr} }
+    .card{
+      border:1px solid var(--line);border-radius:12px;background:var(--card);
+      padding:14px 14px 12px;
+    }
+    .card h3{margin:0 0 8px 0;font-size:15px}
+    .badge{
+      display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--line);
+      font-size:12px;color:var(--muted);background:#fff;margin-left:8px;
+    }
+    nav.toc{
+      border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card);
+      margin: 14px 0 22px;
+    }
+    nav.toc a{color:var(--accent);text-decoration:none}
+    nav.toc a:hover{text-decoration:underline}
+    nav.toc ul{margin:8px 0 0 18px}
+    h2{margin:24px 0 10px;padding-top:8px;border-top:1px solid var(--line);font-size:18px}
+    h3{margin:14px 0 8px;font-size:15px}
+    p{margin:8px 0}
+    code, pre{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    pre{
+      background:var(--codebg);border:1px solid var(--line);border-radius:12px;
+      padding:12px 14px;overflow:auto;margin:10px 0;
+    }
+    table{width:100%;border-collapse:collapse;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:10px 0 14px}
+    th,td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}
+    th{background:#f8fafc;font-weight:600}
+    tr:last-child td{border-bottom:none}
+    .note{border-left:4px solid var(--accent);background:#f3f7ff;padding:10px 12px;border-radius:10px;color:#0b2b66;margin:10px 0}
+    .warn{border-left:4px solid var(--warn);background:#fff7ed;padding:10px 12px;border-radius:10px;color:#7c2d12;margin:10px 0}
+    .ok{border-left:4px solid var(--good);background:#ecfdf5;padding:10px 12px;border-radius:10px;color:#064e3b;margin:10px 0}
+    .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .small{font-size:12.5px;color:var(--muted)}
+    .hr{height:1px;background:var(--line);margin:18px 0}
+    svg{max-width:100%;height:auto}
+    footer{margin-top:26px;border-top:1px solid var(--line);padding-top:12px;color:var(--muted);font-size:12.5px}
+    @media print{
+      .page{max-width:none;padding:18mm}
+      nav.toc{page-break-inside:avoid}
+      pre,table,.card,svg{page-break-inside:avoid}
+      a{color:inherit;text-decoration:none}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>BGS 应用层框架与任务设计 <span class="badge">V1 / CNT 边沿分拣版</span></h1>
+    <div class="meta">
+      日期：2026-02-03<br/>
+      平台：GD32C231G8（48MHz, 64KB Flash） / ADC+DMA / PLS_SO 双边沿 EXTI / NPN 输出（ON=GPIO0）<br/>
+      目标：5ms 响应；先保留 A_buffer/B_buffer 便于调试，后续可优化为直接统计 VA/VB
+    </div>
+  </header>
+
+  <nav class="toc">
+    <strong>目录</strong>
+    <ul>
+      <li><a href="#sec0">0. 概览</a></li>
+      <li><a href="#sec1">1. 分层与任务列表</a></li>
+      <li><a href="#sec2">2. 采样时序与切换（重点）</a></li>
+      <li><a href="#sec3">3. 事件与调度（superloop）</a></li>
+      <li><a href="#sec4">4. 各 Task 需要实现的函数与步骤</a></li>
+      <li><a href="#sec5">5. 参数保存与停采样策略</a></li>
+      <li><a href="#sec6">6. 建议默认参数（100kHz 初版）</a></li>
+    </ul>
+  </nav>
+
+  <section id="sec0">
+    <h2>0. 概览</h2>
+    <div class="grid cols2">
+      <div class="card">
+        <h3>核心检测链路</h3>
+        <ol>
+          <li>ADC 由 TIM 触发采样 <span class="mono">SH_OUT</span>（100kHz 起步）</li>
+          <li>DMA circular 写入 <span class="mono">raw_ring[RAW_LEN]</span>，产生 half/full 事件</li>
+          <li>PLS_SO 双边沿 EXTI：每次边沿记录 <span class="mono">pos = (RAW_LEN - CNT)%RAW_LEN</span> + 相位</li>
+          <li>Task_Meas 按 toggle 事件切分 block，把样本分拣到 <span class="mono">A_buffer/B_buffer</span></li>
+          <li>每 5ms 统计得到 <span class="mono">VA/VB</span>，计算 <span class="mono">V=VB-VA</span>，得到 <span class="mono">presence_raw</span></li>
+          <li>Task_Output 稳定化 presence，按 Light/Dark 映射 output_on，驱动 NPN（ON=GPIO=0）</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>输出与人机</h3>
+        <ul>
+          <li><strong>output_mode</strong>（Light-ON / Dark-ON）由按键切换，且需要 Flash 掉电保存</li>
+          <li><strong>工作灯</strong>建议显示 <span class="mono">output_on</span>（语义与 Light/Dark 一致）</li>
+          <li><strong>电源灯</strong>常亮</li>
+        </ul>
+        <div class="note">
+          <strong>原则：</strong>presence 是物理检测语义（不变）；Light/Dark 只影响输出映射，不改变检测本身。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec1">
+    <h2>1. 分层与任务列表</h2>
+
+    <div class="grid cols2">
+      <div class="card">
+        <h3>分层</h3>
+        <table>
+          <thead><tr><th>层级</th><th>内容</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Driver</strong></td><td>GPIO/EXTI/TIM/ADC+DMA、BitBang 配置 IC、Flash</td></tr>
+            <tr><td><strong>Service</strong></td><td>meas_srv（采样+toggle记录）、param_srv（参数）、ic_cfg_srv、timebase_srv</td></tr>
+            <tr><td><strong>App</strong></td><td>Task_Init / Task_Key / Task_Meas / Task_Output / Task_LED / Task_Param</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>任务触发建议</h3>
+        <table>
+          <thead><tr><th>Task</th><th>触发</th><th>输出</th></tr></thead>
+          <tbody>
+            <tr><td>Task_Init</td><td>每轮调用直到 RUN</td><td>完成参数加载、IC 配置、启动采样</td></tr>
+            <tr><td>Task_Key</td><td>10ms tick</td><td>切换 output_mode、请求保存</td></tr>
+            <tr><td>Task_Meas</td><td>DMA half/full</td><td>分拣 A/B 样本；每 5ms 产出 frame</td></tr>
+            <tr><td>Task_Output</td><td>frame_ready 或 1ms</td><td>presence 稳定化 + output_on + NPN GPIO</td></tr>
+            <tr><td>Task_LED</td><td>10ms tick</td><td>电源灯常亮；工作灯显示 output_on</td></tr>
+            <tr><td>Task_Param</td><td>20~50ms tick</td><td>延时 2s 保存参数（建议停采样）</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec2">
+    <h2>2. 采样时序与切换（重点）</h2>
+
+    <div class="note">
+      <strong>目标：</strong>使用 PLS_SO 的真实边沿作为 A/B 相位边界，不依赖固定 100us。
+      EXTI 双边沿 ISR 里读取 DMA 的 <span class="mono">CNT</span>，换算出边沿发生时 raw 环形缓冲的写入位置 <span class="mono">pos</span>，
+      将 pos 作为切分点，供 Task_Meas 在块处理中做精确分段与分拣。
+    </div>
+
+    <h3>2.1 时序示意图（ASCII）</h3>
+    <pre><code>时间轴 ---&gt;
+
+PLS_SO:  AAAAAAA|BBBBBBB|AAAAAAA|BBBBBBB|....
+               ^       ^       ^       ^
+               |       |       |       |
+             EXTI    EXTI    EXTI    EXTI      （双边沿：每次翻转都触发）
+
+ADC采样:  . . . . . . . . . . . . . . . .     （TIM触发，周期Ts=10us @100kHz）
+
+DMA raw:  [s0 s1 s2 ... s99] [s100 ... s199]   （circular）
+           ^ half event        ^ full event</code></pre>
+
+    <h3>2.2 边沿位置 pos 的计算（在 EXTI ISR 中完成）</h3>
+    <div class="card">
+      <h3>EXTI ISR 最小动作 <span class="badge">必须很短</span></h3>
+      <pre><code>// 1) 读 DMA 剩余传输数
+cnt = dma_transfer_number_get(adc_dma_ch);
+
+// 2) 折算当前 raw 写入位置（近似）
+pos = (RAW_LEN - cnt) % RAW_LEN;
+
+// 3) 读 PLS_SO 当前电平 -&gt; 得到新相位（A/B）
+level = gpio_input_bit_get(PLS_SO_PORT, PLS_SO_PIN);
+phase = (level ? PHASE_B : PHASE_A);   // 具体映射按你实测
+
+// 4) 入队：toggle_event = {pos, phase, time_ms}
+toggle_queue.push(toggle_event);</code></pre>
+      <div class="warn">
+        <strong>注意：</strong>pos 可能与“恰好对应的那个样本”差 0~1 点，这没关系：在 Task_Meas 分段时丢弃每段首尾 N_discard 点即可吸收误差。
+      </div>
+    </div>
+
+    <h3>2.3 Task_Meas 如何用 toggle 切分一个 DMA block</h3>
+    <pre><code>输入：block = raw[start..start+LEN-1]，以及此范围内的 toggle_pos 列表
+输出：若干 segment，每个 segment 属于 A 或 B，相邻 segment 在 toggle_pos 处分界
+
+例：block 覆盖 pos 0..99，其中 toggle 发生在 pos=23, 51, 78
+segments:
+  [0..22] phase=A
+  [23..50] phase=B
+  [51..77] phase=A
+  [78..99] phase=B</code></pre>
+
+    <div class="ok">
+      <strong>好处：</strong>当 A/B 周期变长或变短时，toggle_pos 间距会改变，segments 会自动变长/变短，软件无需改“每相位多少点”的假设。
+    </div>
+
+    <h3>2.4 分拣到 A_buffer/B_buffer（并丢弃首尾点）</h3>
+    <pre><code>对每个 segment:
+  seg_len = end - begin + 1
+  if seg_len &lt;= 2*N_discard + N_min_valid: 丢弃（太短）
+  else:
+    copy segment[begin+N_discard .. end-N_discard] -&gt; A_buffer 或 B_buffer</code></pre>
+
+    <p class="small">
+      建议：100kHz 初版 <span class="mono">N_discard=1</span>（段首尾各丢 1 点）。后续采样率提高时，用“按时间折算点数”的方式调整。
+    </p>
+
+    <h3>2.5 可视化示意图（SVG）</h3>
+    <svg viewBox="0 0 980 260" role="img" aria-label="Sampling timing diagram">
+      <defs>
+        <style>
+          .lbl{font: 12px sans-serif; fill:#111}
+          .mut{font: 12px sans-serif; fill:#555}
+          .line{stroke:#111; stroke-width:2; fill:none}
+          .thin{stroke:#555; stroke-width:1; fill:none}
+          .a{stroke:#0b5fff; stroke-width:3; fill:none}
+          .b{stroke:#b45309; stroke-width:3; fill:none}
+          .evt{stroke:#b91c1c; stroke-width:2}
+          .box{fill:#f6f8fa; stroke:#e5e7eb}
+        </style>
+      </defs>
+
+      <!-- PLS waveform -->
+      <text x="20" y="30" class="lbl">PLS_SO</text>
+      <path class="a" d="M120 40 L220 40 L220 70 L320 70 L320 40 L420 40 L420 70 L520 70 L520 40 L620 40" />
+      <text x="130" y="90" class="mut">A(低)</text>
+      <text x="240" y="90" class="mut">B(高)</text>
+      <text x="350" y="90" class="mut">A</text>
+      <text x="450" y="90" class="mut">B</text>
+
+      <!-- Edge markers -->
+      <line x1="220" y1="30" x2="220" y2="110" class="evt"/>
+      <line x1="320" y1="30" x2="320" y2="110" class="evt"/>
+      <line x1="420" y1="30" x2="420" y2="110" class="evt"/>
+      <line x1="520" y1="30" x2="520" y2="110" class="evt"/>
+      <text x="205" y="25" class="mut">EXTI</text>
+      <text x="305" y="25" class="mut">EXTI</text>
+
+      <!-- ADC sampling ticks -->
+      <text x="20" y="140" class="lbl">ADC@100kHz</text>
+      <line x1="120" y1="150" x2="900" y2="150" class="thin"/>
+      <!-- ticks -->
+      <g class="thin">
+        <line x1="140" y1="145" x2="140" y2="155"/>
+        <line x1="160" y1="145" x2="160" y2="155"/>
+        <line x1="180" y1="145" x2="180" y2="155"/>
+        <line x1="200" y1="145" x2="200" y2="155"/>
+        <line x1="220" y1="145" x2="220" y2="155"/>
+        <line x1="240" y1="145" x2="240" y2="155"/>
+        <line x1="260" y1="145" x2="260" y2="155"/>
+        <line x1="280" y1="145" x2="280" y2="155"/>
+        <line x1="300" y1="145" x2="300" y2="155"/>
+        <line x1="320" y1="145" x2="320" y2="155"/>
+        <line x1="340" y1="145" x2="340" y2="155"/>
+        <line x1="360" y1="145" x2="360" y2="155"/>
+        <line x1="380" y1="145" x2="380" y2="155"/>
+        <line x1="400" y1="145" x2="400" y2="155"/>
+        <line x1="420" y1="145" x2="420" y2="155"/>
+      </g>
+
+      <!-- DMA buffer blocks -->
+      <text x="20" y="200" class="lbl">DMA raw ring</text>
+      <rect x="120" y="190" width="320" height="40" class="box"/>
+      <rect x="460" y="190" width="320" height="40" class="box"/>
+      <text x="135" y="215" class="mut">raw[0..99]  (HALF)</text>
+      <text x="475" y="215" class="mut">raw[100..199] (FULL)</text>
+      <line x1="440" y1="185" x2="440" y2="235" class="evt"/>
+      <text x="410" y="255" class="mut">DMA half/full 事件</text>
+    </svg>
+  </section>
+
+  <section id="sec3">
+    <h2>3. 事件与调度（superloop）</h2>
+    <div class="card">
+      <h3>推荐事件位</h3>
+      <pre><code>EVT_ADC_HALF      // DMA half complete
+EVT_ADC_FULL      // DMA full complete
+EVT_SYSTICK_1MS   // 1ms tick
+EVT_KEY_TICK      // 10ms tick
+EVT_LED_TICK      // 10ms tick
+EVT_PARAM_TICK    // 20~50ms tick
+EVT_FRAME_READY   // 5ms frame produced by Task_Meas
+EVT_OUTPUT_UPDATE // optional: immediate refresh after mode switch</code></pre>
+    </div>
+
+    <div class="card">
+      <h3>主循环执行顺序（建议）</h3>
+      <pre><code>while(1){
+  evt = App_FetchEvents();
+
+  Task_Init();           // until RUN
+
+  if(evt &amp; EVT_KEY_TICK)      Task_Key();
+  if(evt &amp; (EVT_ADC_HALF|EVT_ADC_FULL)) Task_Meas();
+  if(evt &amp; (EVT_FRAME_READY|EVT_SYSTICK_1MS|EVT_OUTPUT_UPDATE)) Task_Output();
+  if(evt &amp; (EVT_LED_TICK|EVT_OUTPUT_UPDATE)) Task_LED();
+  if(evt &amp; EVT_PARAM_TICK)    Task_Param();
+
+  App_Idle();            // WFI / watchdog etc.
+}</code></pre>
+      <div class="note">
+        <strong>建议：</strong>ISR 只置位事件/记录 toggle；重计算全部放在 Task 中完成。
+      </div>
+    </div>
+  </section>
+
+  <section id="sec4">
+    <h2>4. 各 Task 需要实现的函数与步骤</h2>
+
+    <div class="grid cols2">
+      <div class="card">
+        <h3>Task_Init <span class="badge">上电状态机</span></h3>
+        <p><strong>目标：</strong>参数加载 → IC 配置 → 启动采样 → RUN</p>
+        <p><strong>需要实现的接口：</strong></p>
+        <pre><code>void Task_Init(void);
+bool App_IsRunning(void);
+
+bool ParamSrv_Load(AppParam* p);
+bool IcCfgSrv_Apply(void);
+
+void MeasSrv_Start(void);
+void MeasSrv_Stop(void);</code></pre>
+        <p><strong>步骤：</strong></p>
+        <ol>
+          <li>读取 Flash 参数（V_SET、output_mode）</li>
+          <li>BitBang 配置 IC（可重试）</li>
+          <li>启动 TIM/ADC/DMA + 使能 PLS_SO EXTI</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3>Task_Key <span class="badge">Light/Dark 切换</span></h3>
+        <p><strong>触发：</strong>10ms tick（软件去抖）</p>
+        <p><strong>需要实现的接口：</strong></p>
+        <pre><code>void Task_Key(void);
+void KeySrv_Scan10ms(void);
+bool KeySrv_GetShortPress(void);
+
+void ParamSrv_RequestSave(void);</code></pre>
+        <p><strong>步骤：</strong></p>
+        <ol>
+          <li>扫描按键，去抖</li>
+          <li>短按：切换 output_mode（LIGHT_ON &lt;-&gt; DARK_ON）</li>
+          <li>请求保存（延时 2s 再写 Flash）</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3>Task_Meas <span class="badge">采样与分拣核心</span></h3>
+        <p><strong>触发：</strong>DMA half/full</p>
+        <p><strong>需要实现的接口：</strong></p>
+        <pre><code>void Task_Meas(void);
+
+bool MeasSrv_GetBlock(MeasBlock* blk);   // blk: ptr,len,range
+bool MeasSrv_PopToggle(ToggleEvent* ev); // pos,phase,time
+
+void MeasSplitter_ProcessBlock(const MeasBlock* blk);
+bool MeasFrame_IsReady(void);
+void MeasFrame_Get(MeasFrame* frame);</code></pre>
+        <p><strong>步骤（每 block）：</strong></p>
+        <ol>
+          <li>取 raw block（1ms / 100 点）</li>
+          <li>收集 block 范围内的 toggle_pos 列表（可能多个）</li>
+          <li>按 toggle_pos 切分为 segments（每段属于 A 或 B）</li>
+          <li>每段丢弃首尾 N_discard 点，把剩余点写入 A_buffer/B_buffer</li>
+          <li>累计到 5ms 窗口：计算 VA/VB、V、presence_raw，置 EVT_FRAME_READY</li>
+        </ol>
+        <div class="warn">
+          <strong>关键点：</strong>segment 切分依赖 toggle_pos（来自 CNT），而不是“每 10 点切一次”。这样周期变化时自动适配。
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Task_Output <span class="badge">稳定化 + 输出驱动</span></h3>
+        <p><strong>触发：</strong>frame_ready（推荐）或 1ms tick</p>
+        <p><strong>需要实现的接口：</strong></p>
+        <pre><code>void Task_Output(void);
+
+void OutputDrv_SetOn(bool on); // on=1 =&gt; GPIO=0 (NPN导通)
+bool OutputDebounce_Update(bool presence_raw);</code></pre>
+        <p><strong>步骤：</strong></p>
+        <ol>
+          <li>presence_raw 防抖/迟滞（建议 2~3ms）</li>
+          <li>得到 presence（物理语义）</li>
+          <li>按 output_mode 映射：Light-ON: output_on=presence；Dark-ON: output_on=!presence</li>
+          <li>驱动 NPN：output_on=1 → GPIO=0</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3>Task_LED <span class="badge">指示灯</span></h3>
+        <p><strong>触发：</strong>10ms tick</p>
+        <p><strong>需要实现的接口：</strong></p>
+        <pre><code>void Task_LED(void);
+void LedDrv_SetPwr(bool on);
+void LedDrv_SetWork(bool on);</code></pre>
+        <p><strong>建议规则：</strong></p>
+        <ul>
+          <li>电源灯：常亮</li>
+          <li>工作灯：显示 output_on（与 Light/Dark 一致）</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Task_Param <span class="badge">掉电保存</span></h3>
+        <p><strong>触发：</strong>20~50ms tick</p>
+        <p><strong>需要实现的接口：</strong></p>
+        <pre><code>void Task_Param(void);
+
+void ParamSrv_RequestSave(void); // set dirty + deadline
+bool ParamSrv_SaveNow(const AppParam* p);</code></pre>
+        <p><strong>推荐策略：</strong></p>
+        <ol>
+          <li>dirty 后延时 2s 才写（避免频繁擦写）</li>
+          <li>写 Flash 前：短暂停止测量（TIM/ADC/DMA + EXTI）</li>
+          <li>写完恢复测量</li>
+        </ol>
+        <div class="warn">
+          <strong>原因：</strong>Flash 写可能关中断且耗时未知，停采样可避免 DMA/EXTI 丢事件导致测量状态错乱。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec5">
+    <h2>5. 参数保存与停采样策略</h2>
+    <div class="card">
+      <h3>保存内容</h3>
+      <ul>
+        <li><span class="mono">output_mode</span>（必须保存）</li>
+        <li><span class="mono">V_SET</span>（若你也要掉电保存，可一并保存）</li>
+      </ul>
+      <h3>建议 Param 结构</h3>
+      <pre><code>struct AppParam{
+  uint32_t magic;
+  uint16_t version;
+  int32_t  V_SET;
+  uint8_t  output_mode; // 0=LIGHT_ON, 1=DARK_ON
+  uint32_t crc;
+};</code></pre>
+    </div>
+  </section>
+
+  <section id="sec6">
+    <h2>6. 建议默认参数（100kHz 初版）</h2>
+    <table>
+      <thead><tr><th>参数</th><th>建议值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>fs_adc</td><td>100kHz</td><td>后续可提升至 500k/1MHz</td></tr>
+        <tr><td>RAW_LEN</td><td>200</td><td>circular，half=100 点≈1ms</td></tr>
+        <tr><td>N_discard</td><td>1</td><td>每段首尾各丢 1 点，吸收 pos 误差与边界瞬态</td></tr>
+        <tr><td>FRAME_WINDOW</td><td>5ms</td><td>满足 5ms 响应目标</td></tr>
+        <tr><td>KEY_TICK</td><td>10ms</td><td>去抖扫描</td></tr>
+        <tr><td>LED_TICK</td><td>10ms</td><td>显示刷新</td></tr>
+        <tr><td>PARAM_SAVE_DELAY</td><td>2000ms</td><td>避免频繁 Flash 擦写</td></tr>
+        <tr><td>OUTPUT_DEBOUNCE</td><td>2~3ms</td><td>稳定输出，仍满足 5ms</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    导出 PDF：浏览器打开本 HTML → 打印（Print）→ 保存为 PDF。<br/>
+    若你希望我把“toggle_queue + segment 切分”的伪代码进一步细化成可直接实现的 C 模块接口（.h/.c 级），你把你当前 ADC DMA 通道号（DMA_CH0/1/2）以及 raw buffer 在哪个文件/模块中管理告诉我即可。
+  </footer>
+</div>
+</body>
+</html>

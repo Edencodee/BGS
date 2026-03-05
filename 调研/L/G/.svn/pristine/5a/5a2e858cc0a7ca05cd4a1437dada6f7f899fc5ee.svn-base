@@ -1,0 +1,155 @@
+T7E94 000:224.364   SEGGER J-Link V7.96h Log File
+T7E94 000:225.861   DLL Compiled: May 15 2024 15:33:59
+T7E94 000:225.963   Logging started @ 2025-11-18 07:26
+T7E94 000:226.043   Process: D:\Keil_v5\UV4\UV4.exe
+T7E94 000:226.097 - 226.090ms
+T7E94 000:226.154 JLINK_SetWarnOutHandler(...)
+T7E94 000:226.220 - 0.069ms
+T7E94 000:226.275 JLINK_OpenEx(...)
+T7E94 000:233.036   Firmware: J-Link Pro V4 V12 PLUS Jan compiled 4 2025 18:48:20
+T7E94 000:234.016   Firmware: J-Link Pro V4 V12 PLUS Jan compiled 4 2025 18:48:20
+T7E94 000:234.249   Decompressing FW timestamp took 134 us
+T7E94 000:244.752   Hardware: V12.00
+T7E94 000:244.869   S/N: 601024516
+T7E94 000:244.934   OEM: SEGGER
+T7E94 000:244.997   Feature(s): FlashBP, GDB, JFlash, FlashDL, RDI
+T7E94 000:245.847   Bootloader: (Could not read)
+T7E94 000:246.370   USB speed mode: Full speed (12 MBit/s)
+T7E94 000:247.035   TELNET listener socket opened on port 19021
+T7E94 000:248.423   WEBSRV WEBSRV_Init(): Starting webserver thread(s)
+T7E94 000:249.578   WEBSRV Webserver running on local port 19080
+T7E94 000:250.696   Looking for J-Link GUI Server exe at: D:\Keil_v5\ARM\Segger\JLinkGUIServer.exe
+T7E94 000:251.171   Looking for J-Link GUI Server exe at: C:\Program Files\SEGGER\JLink_V796\JLinkGUIServer.exe
+T7E94 000:251.402   Forking J-Link GUI Server: C:\Program Files\SEGGER\JLink_V796\JLinkGUIServer.exe
+T7E94 000:395.249   J-Link GUI Server info: "J-Link GUI server V7.96 "
+T7E94 000:400.384 - 174.086ms returns "O.K."
+T7E94 000:400.479 JLINK_GetEmuCaps()
+T7E94 000:400.517 - 0.035ms returns 0xB9FF7BBF
+T7E94 000:400.562 JLINK_TIF_GetAvailable(...)
+T7E94 000:400.807 - 0.246ms
+T7E94 000:400.874 JLINK_SetErrorOutHandler(...)
+T7E94 000:400.907 - 0.033ms
+T7E94 000:400.959 JLINK_ExecCommand("ProjectFile = "C:\Users\16640\Desktop\lzy\GÏµÁÐ\driver-timer\Keil_project\JLinkSettings.ini"", ...). 
+T7E94 000:420.963   Device "CORTEX-M23" selected.
+T7E94 000:422.233 - 21.276ms returns 0x00
+T7E94 000:422.296 JLINK_ExecCommand("Device = GD32C231C8", ...). 
+T7E94 000:422.506   Device "CORTEX-M23" selected.
+T7E94 000:423.694 - 1.363ms returns 0x00
+T7E94 000:423.738 JLINK_ExecCommand("DisableConnectionTimeout", ...). 
+T7E94 000:423.768 - 0.001ms returns 0x01
+T7E94 000:423.795 JLINK_GetHardwareVersion()
+T7E94 000:423.820 - 0.025ms returns 120000
+T7E94 000:423.846 JLINK_GetDLLVersion()
+T7E94 000:423.871 - 0.024ms returns 79608
+T7E94 000:423.898 JLINK_GetOEMString(...)
+T7E94 000:423.925 JLINK_GetFirmwareString(...)
+T7E94 000:423.950 - 0.025ms
+T7E94 000:423.981 JLINK_GetDLLVersion()
+T7E94 000:424.006 - 0.025ms returns 79608
+T7E94 000:424.032 JLINK_GetCompileDateTime()
+T7E94 000:424.059 - 0.026ms
+T7E94 000:424.087 JLINK_GetFirmwareString(...)
+T7E94 000:424.113 - 0.026ms
+T7E94 000:424.139 JLINK_GetHardwareVersion()
+T7E94 000:424.165 - 0.026ms returns 120000
+T7E94 000:424.192 JLINK_GetSN()
+T7E94 000:424.218 - 0.025ms returns 601024516
+T7E94 000:424.245 JLINK_GetOEMString(...)
+T7E94 000:424.274 JLINK_TIF_Select(JLINKARM_TIF_SWD)
+T7E94 000:424.988 - 0.713ms returns 0x00
+T7E94 000:425.043 JLINK_HasError()
+T7E94 000:425.080 JLINK_SetSpeed(5000)
+T7E94 000:425.202 - 0.123ms
+T7E94 000:426.074 JLINK_HasError()
+T7E94 000:426.120 JLINK_SetResetType(JLINKARM_RESET_TYPE_NORMAL)
+T7E94 000:426.148 - 0.027ms returns JLINKARM_RESET_TYPE_NORMAL
+T7E94 000:426.173 JLINK_Reset()
+T7E94 000:478.749   Found SW-DP with ID 0x0BD12477
+T7E94 000:536.410   DPIDR: 0x0BD12477
+T7E94 000:536.623   CoreSight SoC-400 or earlier
+T7E94 000:536.754   Scanning AP map to find all available APs
+T7E94 000:541.684   AP[0]: Stopped AP scan as end of AP map seems to be reached
+T7E94 000:542.267   Iterating through AP map to find AHB-AP to use
+T7E94 000:542.403   Attach to CPU failed. Executing connect under reset.
+T7E94 000:564.866   DPIDR: 0x0BD12477
+T7E94 000:564.945   CoreSight SoC-400 or earlier
+T7E94 000:564.985   Scanning AP map to find all available APs
+T7E94 000:568.764   AP[0]: Stopped AP scan as end of AP map seems to be reached
+T7E94 000:569.405   Iterating through AP map to find AHB-AP to use
+T7E94 000:569.797   Could not find core in Coresight setup
+T7E94 000:748.316   Found SW-DP with ID 0x0BD12477
+T7E94 000:750.444   DPIDR: 0x0BD12477
+T7E94 000:750.536   CoreSight SoC-400 or earlier
+T7E94 000:750.579   Scanning AP map to find all available APs
+T7E94 000:752.504   AP[0]: Stopped AP scan as end of AP map seems to be reached
+T7E94 000:752.822   Iterating through AP map to find AHB-AP to use
+T7E94 000:752.869   Attach to CPU failed. Executing connect under reset.
+T7E94 000:774.901   DPIDR: 0x0BD12477
+T7E94 000:774.996   CoreSight SoC-400 or earlier
+T7E94 000:775.035   Scanning AP map to find all available APs
+T7E94 000:778.373   AP[0]: Stopped AP scan as end of AP map seems to be reached
+T7E94 000:778.802   Iterating through AP map to find AHB-AP to use
+T7E94 000:778.863   Could not find core in Coresight setup
+T7E94 000:880.130 - 453.953ms
+T7E94 000:880.363 JLINK_GetId()
+T7E94 000:883.109   Found SW-DP with ID 0x0BD12477
+T7E94 000:890.992   DPIDR: 0x0BD12477
+T7E94 000:891.084   CoreSight SoC-400 or earlier
+T7E94 000:891.124   Scanning AP map to find all available APs
+T7E94 000:895.329   AP[0]: Stopped AP scan as end of AP map seems to be reached
+T7E94 000:895.892   Iterating through AP map to find AHB-AP to use
+T7E94 000:895.994   Attach to CPU failed. Executing connect under reset.
+T7E94 000:921.866   DPIDR: 0x0BD12477
+T7E94 000:922.014   CoreSight SoC-400 or earlier
+T7E94 000:922.159   Scanning AP map to find all available APs
+T7E94 000:926.001   AP[0]: Stopped AP scan as end of AP map seems to be reached
+T7E94 000:926.598   Iterating through AP map to find AHB-AP to use
+T7E94 000:926.717   Could not find core in Coresight setup
+T7E94 001:108.765   Found SW-DP with ID 0x0BD12477
+T7E94 001:114.426   DPIDR: 0x0BD12477
+T7E94 001:114.640   CoreSight SoC-400 or earlier
+T7E94 001:114.759   Scanning AP map to find all available APs
+T7E94 001:117.770   AP[0]: Stopped AP scan as end of AP map seems to be reached
+T7E94 001:120.188   Iterating through AP map to find AHB-AP to use
+T7E94 001:120.367   Attach to CPU failed. Executing connect under reset.
+T7E94 001:145.049   DPIDR: 0x0BD12477
+T7E94 001:145.259   CoreSight SoC-400 or earlier
+T7E94 001:145.497   Scanning AP map to find all available APs
+T7E94 001:149.331   AP[0]: Stopped AP scan as end of AP map seems to be reached
+T7E94 001:149.906   Iterating through AP map to find AHB-AP to use
+T7E94 001:150.025   Could not find core in Coresight setup
+T7E94 001:250.529 - 370.162ms returns 0x00000000
+T7E94 001:251.777 JLINK_GetId()
+T7E94 001:255.609   Found SW-DP with ID 0x0BD12477
+T7E94 001:261.262   DPIDR: 0x0BD12477
+T7E94 001:261.434   CoreSight SoC-400 or earlier
+T7E94 001:261.563   Scanning AP map to find all available APs
+T7E94 001:266.543   AP[0]: Stopped AP scan as end of AP map seems to be reached
+T7E94 001:268.519   Iterating through AP map to find AHB-AP to use
+T7E94 001:268.838   Attach to CPU failed. Executing connect under reset.
+T7E94 001:291.174   DPIDR: 0x0BD12477
+T7E94 001:291.451   CoreSight SoC-400 or earlier
+T7E94 001:291.599   Scanning AP map to find all available APs
+T7E94 001:295.394   AP[0]: Stopped AP scan as end of AP map seems to be reached
+T7E94 001:295.841   Iterating through AP map to find AHB-AP to use
+T7E94 001:295.934   Could not find core in Coresight setup
+T7E94 001:477.096   Found SW-DP with ID 0x0BD12477
+T7E94 001:483.280   DPIDR: 0x0BD12477
+T7E94 001:483.455   CoreSight SoC-400 or earlier
+T7E94 001:483.567   Scanning AP map to find all available APs
+T7E94 001:486.340   AP[0]: Stopped AP scan as end of AP map seems to be reached
+T7E94 001:486.905   Iterating through AP map to find AHB-AP to use
+T7E94 001:487.028   Attach to CPU failed. Executing connect under reset.
+T7E94 001:512.164   DPIDR: 0x0BD12477
+T7E94 001:512.259   CoreSight SoC-400 or earlier
+T7E94 001:512.300   Scanning AP map to find all available APs
+T7E94 001:515.996   AP[0]: Stopped AP scan as end of AP map seems to be reached
+T7E94 001:516.474   Iterating through AP map to find AHB-AP to use
+T7E94 001:516.741   Could not find core in Coresight setup
+T7E94 001:617.135 - 365.354ms returns 0x00000000
+T7E94 001:634.559 JLINK_GetFirmwareString(...)
+T7E94 001:634.660 - 0.100ms
+T7E94 002:854.600 JLINK_Close()
+T7E94 002:867.998 - 13.397ms
+T7E94 002:868.112   
+T7E94 002:868.154   Closed

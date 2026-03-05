@@ -1,0 +1,80 @@
+T24F8 000:418.943   SEGGER J-Link V7.96c Log File
+T24F8 000:420.220   DLL Compiled: Apr  2 2024 12:30:42
+T24F8 000:420.317   Logging started @ 2026-02-07 09:45
+T24F8 000:420.407   Process: D:\programs\Keil_v5\UV4\UV4.exe
+T24F8 000:420.526 - 420.513ms
+T24F8 000:420.633 JLINK_SetWarnOutHandler(...)
+T24F8 000:420.724 - 0.095ms
+T24F8 000:420.829 JLINK_OpenEx(...)
+T24F8 000:446.435   Firmware: J-Link V9 compiled Dec  8 2023 20:16:22
+T24F8 000:448.296   Firmware: J-Link V9 compiled Dec  8 2023 20:16:22
+T24F8 000:449.571   Decompressing FW timestamp took 923 us
+T24F8 000:456.710   Hardware: V9.70
+T24F8 000:456.916   S/N: 602713429
+T24F8 000:457.064   OEM: SEGGER
+T24F8 000:457.200   Feature(s): GDB, RDI, FlashBP, FlashDL, JFlash
+T24F8 000:458.908   Bootloader: (Could not read)
+T24F8 000:460.434   TELNET listener socket opened on port 19021
+T24F8 000:462.232   WEBSRV WEBSRV_Init(): Starting webserver thread(s)
+T24F8 000:462.662   WEBSRV Failed to put socket into listener state (port 19080)
+T24F8 000:463.759   WEBSRV Webserver running on local port 19081
+T24F8 000:464.677   Looking for J-Link GUI Server exe at: D:\programs\Keil_v5\ARM\Segger\JLinkGUIServer.exe
+T24F8 000:465.615   Looking for J-Link GUI Server exe at: D:\SEGGER\JLink_V796c\JLinkGUIServer.exe
+T24F8 000:466.010   Forking J-Link GUI Server: D:\SEGGER\JLink_V796c\JLinkGUIServer.exe
+T24F8 000:515.411   J-Link GUI Server info: "J-Link GUI server V7.96c "
+T24F8 000:518.020 - 96.289ms returns "O.K."
+T24F8 000:518.129 JLINK_GetEmuCaps()
+T24F8 000:518.177 - 0.043ms returns 0xB9FF7BBF
+T24F8 000:518.223 JLINK_TIF_GetAvailable(...)
+T24F8 000:518.462 - 0.238ms
+T24F8 000:518.526 JLINK_SetErrorOutHandler(...)
+T24F8 000:518.580 - 0.053ms
+T24F8 000:518.835 JLINK_ExecCommand("ProjectFile = "D:\Workspace\doc\HP6_BS\Proj\V1.0\Driver\Driver1_GPIO\App\Keil_project\JLinkSettings.ini"", ...). 
+T24F8 000:554.028   Ref file found at: D:\programs\Keil_v5\ARM\Segger\JLinkDevices.ref
+T24F8 000:554.793   REF file references invalid XML file: D:\SEGGER\JLink_V796c\JLinkDevices.xml
+T24F8 000:559.489   Device "CORTEX-M23" selected.
+T24F8 000:560.670 - 41.836ms returns 0x00
+T24F8 000:561.028 JLINK_ExecCommand("Device = GD32C231C8", ...). 
+T24F8 000:561.352   Device "CORTEX-M23" selected.
+T24F8 000:562.442 - 1.327ms returns 0x00
+T24F8 000:562.528 JLINK_ExecCommand("DisableConnectionTimeout", ...). 
+T24F8 000:562.598 - 0.003ms returns 0x01
+T24F8 000:562.663 JLINK_GetHardwareVersion()
+T24F8 000:562.740 - 0.058ms returns 97000
+T24F8 000:562.801 JLINK_GetDLLVersion()
+T24F8 000:562.856 - 0.055ms returns 79603
+T24F8 000:562.918 JLINK_GetOEMString(...)
+T24F8 000:562.982 JLINK_GetFirmwareString(...)
+T24F8 000:563.039 - 0.057ms
+T24F8 000:563.104 JLINK_GetDLLVersion()
+T24F8 000:563.160 - 0.055ms returns 79603
+T24F8 000:563.222 JLINK_GetCompileDateTime()
+T24F8 000:563.281 - 0.059ms
+T24F8 000:563.343 JLINK_GetFirmwareString(...)
+T24F8 000:563.400 - 0.057ms
+T24F8 000:563.466 JLINK_GetHardwareVersion()
+T24F8 000:563.522 - 0.056ms returns 97000
+T24F8 000:563.586 JLINK_GetSN()
+T24F8 000:563.646 - 0.059ms returns 602713429
+T24F8 000:563.706 JLINK_GetOEMString(...)
+T24F8 000:563.933 JLINK_TIF_Select(JLINKARM_TIF_SWD)
+T24F8 000:564.830 - 0.897ms returns 0x00
+T24F8 000:564.902 JLINK_HasError()
+T24F8 000:564.973 JLINK_SetSpeed(5000)
+T24F8 000:565.268 - 0.298ms
+T24F8 000:565.983 JLINK_HasError()
+T24F8 000:566.071 JLINK_SetResetType(JLINKARM_RESET_TYPE_NORMAL)
+T24F8 000:566.126 - 0.055ms returns JLINKARM_RESET_TYPE_NORMAL
+T24F8 000:566.180 JLINK_Reset()
+T24F8 000:669.961   Failed to attach to CPU. Trying connect under reset.
+T24F8 001:380.290 - 814.104ms
+T24F8 001:380.674 JLINK_GetId()
+T24F8 001:668.712 - 288.033ms returns 0x00000000
+T24F8 001:669.711 JLINK_GetId()
+T24F8 001:955.086 - 285.372ms returns 0x00000000
+T24F8 001:963.782 JLINK_GetFirmwareString(...)
+T24F8 001:963.939 - 0.157ms
+T24F8 005:100.796 JLINK_Close()
+T24F8 005:103.535 - 2.738ms
+T24F8 005:103.672   
+T24F8 005:103.747   Closed

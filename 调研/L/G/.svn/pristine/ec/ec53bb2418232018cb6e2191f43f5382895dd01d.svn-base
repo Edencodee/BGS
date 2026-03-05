@@ -1,0 +1,404 @@
+#ifndef __USER_FLASH_H
+#define __USER_FLASH_H
+
+#ifdef cplusplus
+extern "C" {
+#endif
+
+#include "gd32f4xx.h"
+#include <stdbool.h>
+
+#define PAGE_SIZE			0x1000		/* 4k										*/
+#define FMC_SIZE_IN_BYTES	0x78000		/* 512kB - 32kB								*/
+
+	/* boot 16k, sector 0, 0x8000000~0x8003fff	*/
+#define REG_ADDR			0x8004000ul	/* REG  16k, sector 1, 0x8004000~0x8007fff	*/
+#define PARA_ADDR			0x8008000ul /* PARA 16k, sector 2, 0x8008000~0x800Bfff	*/
+#define COEF_ADDR			0x800C000ul /* COEF 16k, sector 3, 0x800C000~0x800Ffff	*/
+#define APP_ADDR			0x8010000ul	/* app, 0x8010000~0x80fffff 				*/
+
+	/* sector size */
+#define SIZE_16KB           ((uint32_t)0x00004000U)        /* size of  16KB	*/
+#define SIZE_64KB           ((uint32_t)0x00010000U)        /* size of  64KB	*/
+#define SIZE_128KB          ((uint32_t)0x00020000U)        /* size of 128KB	*/
+#define SIZE_256KB          ((uint32_t)0x00040000U)        /* size of 256KB	*/
+
+	/* FMC BANK address */
+#define FMC_START_ADDRESS          FLASH_BASE                               /* FMC start address 		*/
+#define FMC_BANK0_START_ADDRESS    FMC_START_ADDRESS                        /* FMC BANK0 start address	*/
+#define FMC_BANK1_START_ADDRESS    ((uint32_t)0x08100000U)                  /* FMC BANK1 start address	*/
+#define FMC_SIZE                   (*(uint16_t *)0x1FFF7A22U)               /* FMC SIZE					*/
+#define FMC_END_ADDRESS            (FLASH_BASE + (FMC_SIZE * 1024) - 1)     /* FMC end address			*/
+#define FMC_MAX_END_ADDRESS        ((uint32_t)0x08300000U)                  /* FMC maximum end address	*/
+
+	/* FMC error message */
+#define FMC_WRONG_SECTOR_NAME      ((uint32_t)0xFFFFFFFFU)	/* wrong sector name		*/
+#define FMC_WRONG_SECTOR_NUM       ((uint32_t)0xFFFFFFFFU)	/* wrong sector number		*/
+#define FMC_INVALID_SIZE           ((uint32_t)0xFFFFFFFFU)	/* invalid sector size		*/
+#define FMC_INVALID_ADDR           ((uint32_t)0xFFFFFFFFU)	/* invalid sector address	*/
+
+	/* FMC sector information */
+	typedef struct {
+		uint32_t sector_name;			/* the name of the sector			*/
+		uint32_t sector_num;			/* the number of the sector			*/
+		uint32_t sector_size;			/* the size of the sector			*/
+		uint32_t sector_start_addr;		/* the start address of the sector	*/
+		uint32_t sector_end_addr;		/* the end address of the sector	*/
+	} fmc_sector_info_struct;
+#if APP
+	typedef enum {
+		kFlagDebugW = 0,
+		kFlagSearch,
+		kFlagInit,
+		kFlagWriteReg,
+		kFlagWritePara,
+		kFlagWriteCoef,
+		kFlagOverRange,
+		kFlagLock,
+		kFlagLastRead,
+		kFlagDistAsk,
+		kFlagDistUpdate,
+		kFlagDebugR,
+		kFlagDebugP,
+		kFlagLdOff
+	} flag_t;
+
+	/* reg enum ----------------------------------- */
+	typedef enum {
+		kNpn = 0,
+		kPnp
+	} npn_t;
+
+	typedef enum {
+		kModStandard = 0,
+		kModHiSpeed,
+		kModHiPrecise
+	} mod_t;
+
+	typedef enum {
+		kNO = 0,
+		kNC
+	} nonc_t;
+
+	typedef enum {
+		kGenOut = 0,
+		k1PTeach,
+		k2PTeach,
+		k3PTeach,
+	} out_t;
+
+	typedef enum {
+		k4_20mA = 0,
+		k0_10V
+	} analog_t;
+
+	typedef enum {
+		kInNone = 0,
+		kInSetOffs,
+		kInTeach,
+		kInLdOff
+	} in_t;
+
+	typedef enum {
+		kDlyOff = 0,
+		kOnDly,
+		kOffDly,
+		kOnOffDly,
+		kSinglePulse
+	} out_dly_t;
+
+	typedef enum {
+		kDpStandard = 0,
+		kDpReverse,
+		kDpOffs
+	} dsp_t;
+
+	typedef enum {
+		kKeepOn = 0,
+		kKeepOff
+	} keep_t;
+
+	typedef enum {
+		kSrOn = 0,
+		kSrTmoOff
+	} screen_t;
+
+	typedef enum {
+		kChinese = 0,
+		kEnglish
+	} language_t;
+
+	typedef enum {
+		kReset = 0,
+		kReturn
+	} reset_opt_t;
+
+	typedef enum {
+		kBps9600 = 0,
+		kBps19200,
+		kBps38400,
+		kBps57600,
+		kBps115200,
+		kBps256000,
+		kBps500000
+	} bps_t;
+	/* -------------------------------------------- */
+	/* reg type enum ------------------------------ */
+	typedef enum {
+		kS16 = 1,
+		kU16,
+		kS32,
+		kU32,
+		kFP32
+	} dat_typ_t;
+
+	typedef enum {
+		kMul1 = 1,
+		kMulk
+	} mul_typ_t;
+
+	typedef struct {
+		dat_typ_t dt;
+		mul_typ_t mt;
+	} reg_typ_t;
+
+	typedef enum {
+		kDirFwd = 0,
+		kDirRes,
+	} dsp_dir_t;
+	/* -------------------------------------------- */
+	/* reg define --------------------------------- */
+	typedef struct {
+		uint16_t res0;
+		uint16_t period;
+		uint16_t res2;
+		uint16_t npn;
+		uint16_t contiune;
+		uint16_t mod;
+		uint16_t nonc1;
+		uint16_t nonc2;
+		uint16_t bpsEnum;
+		uint16_t out;
+		int32_t  diff;
+		uint16_t in;
+		uint16_t dly;
+		uint16_t dlyT;
+		uint16_t dsp;
+		uint16_t keep;
+		uint16_t screen;
+		int32_t  offs;
+		uint32_t bps;
+		uint16_t analog;
+		uint16_t language;
+		uint16_t addr;
+		uint16_t res25;
+		uint16_t res26;
+		uint16_t gain;
+		uint16_t res4;
+		uint16_t dspDir;
+		int32_t  tolerance;
+		
+		uint16_t res32_39[8];
+		
+		int32_t  q1thr1;
+		int32_t  q1thr2;
+		int32_t  q2thr1;
+		int32_t  q2thr2;
+
+		uint16_t res48_59[12];
+
+		float    wtop;
+		float    wbtm;
+		float    res64_65;
+		float    res66_67;
+		uint32_t range;
+		uint32_t measDist;
+		
+		uint16_t res72_89[18];
+		
+		float    pos;
+		int32_t  distSpd;
+		int32_t  distStd;
+		int32_t  distHi;
+		int32_t  dist10;
+		int32_t  distDsp;
+		uint16_t flag;
+		uint16_t reset;
+		uint16_t res104;
+		uint16_t res105;
+		uint16_t zero;
+	} s_reg_t;
+	
+	typedef struct {
+		uint32_t flag;
+		
+		float res1;
+		float res2;
+		float res3;
+		float res4;
+		
+		float xs[PN];
+		uint32_t ys[PN];
+		int32_t currIdx;
+
+		int32_t offs10;
+	} s_para_t;
+
+	typedef struct {
+		float a[PN];
+		float b[PN];
+		float c[PN];
+		float d[PN];
+	} s_coef_t;
+
+	typedef enum {
+//		k5PCali     = 0x5555,
+//		kCenterCali = 0x555A,
+//		kNPFit3Cali = 0x55AA,
+//		kNPFit4Cali = 0x5AAA,
+		kNPIntpCali = 0xAAAA
+	} cali_type_t;
+
+	typedef enum {
+		kRegRes0 = 0,	// 0
+		kRegPeriod,		// 1
+		kRegRes2,		// 2
+		kRegNPN,		// 3
+		kRegContinue,	// 4
+		kRegMod,		// 5
+		kRegNONC1,		// 6
+		kRegNONC2,		// 7
+		kRegBpsEnum,	// 8
+		kRegOut,		// 9
+		kRegDiff,		// 10
+		kRegDiffH,		// 11
+		kRegIn,			// 12
+		kRegDly,		// 13
+		kRegDlyT,		// 14
+		kRegDsp,		// 15
+		kRegKeep,		// 16
+		kRegScreen,		// 17
+		kRegOffs,		// 18
+		kRegOffsH,		// 19
+		kRegBps,		// 20
+		kRegBpsH,		// 21
+		kRegAnalog, 	// 22
+		kRegLanguage,	// 23
+		kRegAddr,		// 24
+		kRegRes25,		// 25
+		kRegRes26,		// 26
+		kRegGain,		// 27
+		kRegRes28,		// 28
+		kRegDspDir,		// 29
+		kRegTolerance,	// 30 
+		kRegToleranceH,	// 31
+		kRegSetCnt,
+
+		kRegQ1Thr1 = 40,// 40
+		kRegQ1Thr1H,	// 41
+		kRegQ1Thr2,     // 42
+		kRegQ1Thr2H,    // 43
+		kRegQ2Thr1,     // 44
+		kRegQ2Thr1H,    // 45
+		kRegQ2Thr2,     // 46
+		kRegQ2Thr2H,    // 47
+		kRegThrCnt,
+
+		kRegWTop = 60,	// 60
+		kRegWTopH,		// 61
+		kRegWBtm,       // 62
+		kRegWBtmH,      // 63
+		kRegRes64,	    // 64
+		kRegRes65,      // 65
+		kRegRes66,      // 66
+		kRegRes67,      // 67
+		kRegRange,      // 68
+		kRegRangeH,     // 69
+		kRegMeasDst,	// 70
+		kRegMeasDstH,	// 71
+		kRegRes72,	    // 72
+		kRegRes73,	    // 73
+		kRegRes74,	    // 74
+		kRegRes75,	    // 75
+		kRegRes76,		// 76
+		kRegRes77,      // 77
+		kRegRes78,		// 78
+		kRegRes79,      // 79
+		kRegRes80,      // 80
+		kRegRes81,      // 81
+		kRegRes82,      // 82
+		kRegRes83,      // 83
+		kRegPosCnt,
+
+		kRegPos = 90,	// 90
+		kRegPosH,		// 91
+		kRegDistSpd,	// 92
+		kRegDistSpdH,	// 93
+		kRegDistStd,    // 94
+		kRegDistStdH,   // 95
+		kRegDistHi,     // 96
+		kRegDistHiH,    // 97
+		kRegDist10,		// 98
+		kRegDist10H,    // 99
+		kRegDistDsp,	// 100
+		kRegDistDspH,	// 101
+		kRegFlag,       // 102
+		kRegReset,      // 103
+		kRegRes104,     // 104
+		kRegRes105,   	// 105
+		kRegZero,		// 106
+		kRegTempCnt, 
+
+		kRegCnt
+	} reg_idx_t;
+	
+	extern __IO s_reg_t g_sreg;
+	extern __IO uint16_t *g_reg;
+	extern s_reg_t sregDef;
+	extern uint16_t *regDef;
+	extern s_reg_t sregMax;
+	extern uint16_t *regMax;
+	extern s_reg_t sregMin;
+	extern uint16_t *regMin;
+	extern __IO uint16_t* g_rom;
+
+	extern __IO s_para_t g_spara;
+	extern __IO s_coef_t g_scoef;
+#endif
+	/* -------------------------------------------- */
+	/* using in boot */
+	fmc_sector_info_struct FLASH_InfoGet (uint32_t addr);
+	void FLASH_UserErase (uint32_t sectorNum);
+	void FLASH_UserWrite (uint32_t addr, uint32_t *buf, uint16_t size);
+#if APP	
+	int  S32ToStr ( int32_t s32, char *str, int dot);
+	int  U32ToStr (uint32_t u32, char *str, int dot);
+	int  S32ToStr1( int32_t s32, char *str, int dot);
+	int  U32ToStr1(uint32_t u32, char *str, int dot);
+	int  FLASH_GetIntRegStr (uint32_t index, char* str);
+	void FLASH_RegSetDef (int index);
+	void FLASH_RegSetMin (int index);
+	void FLASH_RegReload (int index);
+	void FLASH_RegSetMax (int index);
+	void FLASH_RegSetMid (int index);
+	void FLASH_IntRegAdd (int index);
+	void FLASH_IntRegSub (int index);
+	int  FLASH_RegMinChk (int index);
+	int  FLASH_RegMaxChk (int index);
+	void FLASH_RegWrite  (void);
+	void FLASH_ParaWrite (void);
+	void FLASH_CoefWrite (void);
+	void FLASH_RegLoadChk (void);
+	void FLASH_RegReinit  (void);
+	void FLASH_ParaLoadChk(void);
+	void FLASH_CoefLoadChk(void);
+
+	bool ChkFlag (flag_t flag);
+	void SetFlag (flag_t flag);
+	void ClrFlag (flag_t flag);
+#endif	
+#ifdef cplusplus
+}
+#endif
+
+#endif

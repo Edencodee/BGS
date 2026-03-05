@@ -1,0 +1,754 @@
+<!-- 
+  优化的Flash驱动和传感器参数管理系统使用指南
+  设计用于：灵活的参数定义、版本管理、掉电保护、工厂恢复
+-->
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVM参数管理系统 - 优化设计指南</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #007AFF;
+            --success: #34C759;
+            --warning: #FF9500;
+            --danger: #FF3B30;
+            --bg: #F5F5F7;
+            --surface: #FFFFFF;
+            --text: #1D1D1D;
+            --text-sec: #86868B;
+            --border: #E5E5EA;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary), #5AC8FA);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        section {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        h2 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid var(--primary);
+        }
+
+        h3 {
+            color: var(--text);
+            margin-top: 1.5rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .code-block {
+            background: #2D2D30;
+            color: #D4D4D4;
+            padding: 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Menlo', 'Monaco', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            margin: 1rem 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(0,122,255,0.1), rgba(90,200,250,0.1));
+            border-left: 4px solid var(--primary);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .feature-card {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 16px rgba(0,122,255,0.2);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-title {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-desc {
+            color: var(--text-sec);
+            font-size: 0.95rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.8rem;
+            text-align: left;
+        }
+
+        th {
+            background: var(--bg);
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        tr:hover {
+            background: var(--bg);
+        }
+
+        ul, ol {
+            margin-left: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .tag-new {
+            background: var(--success);
+            color: white;
+        }
+
+        .tag-improve {
+            background: var(--warning);
+            color: white;
+        }
+
+        .tag-api {
+            background: var(--primary);
+            color: white;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-sec);
+            border-top: 1px solid var(--border);
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>⚡ 优化的NVM参数管理系统</h1>
+        <p class="subtitle">Flash驱动 + 灵活参数定义 + 版本管理 + 掉电保护</p>
+    </header>
+
+    <div class="container">
+        <!-- 概述 -->
+        <section>
+            <h2>📋 系统概述</h2>
+            <p>
+                这是一个为NVM（非易失性内存）参数管理设计的完整Flash参数管理方案，在原有Flash驱动的基础上，增加了参数化抽象层，
+                使得参数定义、存储、读写和恢复都变得灵活而高效。
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <div class="feature-title">灵活参数定义</div>
+                    <div class="feature-desc">使用结构体模板定义参数，易于新增、删减和修改参数字段</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📦</div>
+                    <div class="feature-title">两套参数表</div>
+                    <div class="feature-desc">出厂默认参数和用户配置参数并存，随时可以恢复出厂设置</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <div class="feature-title">版本管理</div>
+                    <div class="feature-desc">参数结构体变化时自动迁移，保持向后兼容性</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <div class="feature-title">掉电保护</div>
+                    <div class="feature-desc">基于A/B页备份机制，任何时刻掉电都能恢复至少一套完整配置</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">✅</div>
+                    <div class="feature-title">完整验证</div>
+                    <div class="feature-desc">写入前自动验证参数范围，确保配置始终有效</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🐛</div>
+                    <div class="feature-title">调试友好</div>
+                    <div class="feature-desc">丰富的打印输出和错误码，便于开发和维护</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 架构设计 -->
+        <section>
+            <h2>🏗️ 系统架构</h2>
+
+            <h3>分层结构</h3>
+            <pre class="code-block">
+┌─────────────────────────────────────────────┐
+│   应用层 (Application)                       │
+│   └─ 传感器控制、业务逻辑                    │
+├─────────────────────────────────────────────┤
+│   参数管理层 (nvm_param.h/c)  [新增]  │
+│   ├─ 参数读写：nvm_param_read/write        │
+│   ├─ 参数验证：nvm_param_validate          │
+│   ├─ 工厂恢复：nvm_param_restore_factory   │
+│   ├─ 版本迁移：nvm_param_version_migrate   │
+│   └─ RAM缓存：减少Flash访问次数             │
+├─────────────────────────────────────────────┤
+│   Flash驱动层 (bsp_flash.h/c)               │
+│   ├─ 页面擦除：flash_erase_page            │
+│   ├─ 数据写入：flash_write                  │
+│   ├─ 数据读取：flash_read                   │
+│   ├─ 数据保存：flash_save_data (A/B备份)  │
+│   └─ 数据加载：flash_load_data             │
+├─────────────────────────────────────────────┤
+│   FMC库 (gd32c2x1_fmc.c)                    │
+│   └─ GD32C231硬件Flash接口                  │
+└─────────────────────────────────────────────┘
+            </pre>
+
+            <h3>数据流向</h3>
+            <div class="highlight-box">
+                <strong>写入流程：</strong><br>
+                应用数据 → 参数验证 → RAM缓存更新 → Flash写入(A或B页) → 写后验证<br><br>
+                <strong>读取流程：</strong><br>
+                Flash(A/B页) → 格式转换 → RAM缓存 → 应用读取<br><br>
+                <strong>恢复流程：</strong><br>
+                出厂默认值 → 验证 → Flash写入 → 版本检查 → 迁移处理
+            </div>
+        </section>
+
+        <!-- 参数结构体定义 -->
+        <section>
+            <h2>📐 参数结构体定义</h2>
+
+            <h3>如何定义传感器参数</h3>
+            <p>参数结构体在 <code>nvm_param.h</code> 中定义，遵循以下原则：</p>
+
+            <ol>
+                <li><strong>按功能分组</strong> - 将相关参数组织在一起，便于理解和维护</li>
+                <li><strong>字段命名清晰</strong> - 使用有意义的变量名和注释说明范围</li>
+                <li><strong>预留扩展空间</strong> - 为未来增加参数留出空间</li>
+                <li><strong>使用packed属性</strong> - 确保内存紧凑，便于Flash存储</li>
+            </ol>
+
+            <h3>参数定义示例</h3>
+            <div class="code-block">
+typedef struct {
+    /* ===== 脉冲和增益相关参数 ===== */
+    uint8_t pls;                    /* [4:11]   发射脉冲幅值 */
+    uint16_t fine_gain;             /* [14:23]  细调增益 (10bit) */
+    uint8_t coarse_gain1;           /* [29:32]  粗调增益1 */
+    
+    /* ===== 模式和配置参数 ===== */
+    uint8_t work_mode;              /* [0:2]    工作模式 */
+    uint8_t sample_rate;            /* [8:15]   采样率(kHz) */
+    
+    /* ===== 阈值和触发参数 ===== */
+    uint16_t threshold_high;        /* [0:15]   高阈值 */
+    uint16_t threshold_low;         /* [0:15]   低阈值 */
+    
+    /* ===== 功能使能标志 ===== */
+    uint8_t auto_calibration;       /* [0:1]    自动校准使能 */
+    uint8_t temperature_compensation; /* [0:1]  温度补偿使能 */
+    
+    /* ===== 预留字段 ===== */
+    uint16_t reserved1;
+    uint32_t reserved2;
+    
+} __attribute__((packed)) sensor_param_t;
+            </div>
+
+            <h3>如何新增参数</h3>
+            <ol>
+                <li>在 <code>sensor_param_t</code> 中增加新字段</li>
+                <li>在 <code>FACTORY_DEFAULTS</code> 中初始化默认值</li>
+                <li>在宏定义中添加参数范围（<code>PARAM_*_MIN/MAX</code>）</li>
+                <li>在 <code>nvm_param_validate()</code> 中添加范围检查</li>
+                <li>在 <code>nvm_param_print()</code> 中添加打印输出</li>
+                <li>增加 <code>NVM_PARAM_VERSION</code> 版本号</li>
+            </ol>
+
+            <h3>参数范围验证</h3>
+            <p>参数范围在写入前自动验证，确保Flash中存储的始终是有效数据：</p>
+            <table>
+                <tr>
+                    <th>参数名</th>
+                    <th>最小值</th>
+                    <th>最大值</th>
+                    <th>额外规则</th>
+                </tr>
+                <tr>
+                    <td>pls（脉冲幅值）</td>
+                    <td>4</td>
+                    <td>11</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>fine_gain（细调增益）</td>
+                    <td>0</td>
+                    <td>1023</td>
+                    <td>10bit精度</td>
+                </tr>
+                <tr>
+                    <td>coarse_gain1（粗调增益）</td>
+                    <td>0</td>
+                    <td>15</td>
+                    <td>4bit精度</td>
+                </tr>
+                <tr>
+                    <td>threshold_high（高阈值）</td>
+                    <td>0</td>
+                    <td>65535</td>
+                    <td>必须 > threshold_low</td>
+                </tr>
+                <tr>
+                    <td>threshold_low（低阈值）</td>
+                    <td>0</td>
+                    <td>65535</td>
+                    <td>必须 < threshold_high</td>
+                </tr>
+            </table>
+        </section>
+
+        <!-- API参考 -->
+        <section>
+            <h2>📚 API参考</h2>
+
+            <h3>核心函数</h3>
+            <table>
+                <tr>
+                    <th>函数</th>
+                    <th>功能</th>
+                    <th>参数</th>
+                    <th>返回值</th>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_init()</code></td>
+                    <td>初始化参数模块</td>
+                    <td>无</td>
+                    <td>NVM_PARAM_OK 或错误码</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_read(config)</code></td>
+                    <td>读取参数到RAM</td>
+                    <td>sensor_param_t指针</td>
+                    <td>NVM_PARAM_OK 或错误码</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_write(config)</code></td>
+                    <td>保存参数到Flash</td>
+                    <td>sensor_param_t指针</td>
+                    <td>NVM_PARAM_OK 或错误码</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_validate(config)</code></td>
+                    <td>验证参数有效性</td>
+                    <td>sensor_param_t指针</td>
+                    <td>NVM_PARAM_OK 或错误码</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_restore_factory(config)</code></td>
+                    <td>恢复出厂设置</td>
+                    <td>sensor_param_t指针（可选）</td>
+                    <td>NVM_PARAM_OK 或错误码</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_print(config)</code></td>
+                    <td>打印参数信息</td>
+                    <td>sensor_param_t指针</td>
+                    <td>无</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_get_version()</code></td>
+                    <td>获取版本号</td>
+                    <td>无</td>
+                    <td>版本号</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param_version_migrate(old_ver, config)</code></td>
+                    <td>版本迁移</td>
+                    <td>旧版本号、config指针</td>
+                    <td>NVM_PARAM_OK 或错误码</td>
+                </tr>
+            </table>
+
+            <h3>错误码定义</h3>
+            <table>
+                <tr>
+                    <th>错误码</th>
+                    <th>值</th>
+                    <th>含义</th>
+                    <th>处理方案</th>
+                </tr>
+                <tr>
+                    <td>NVM_PARAM_OK</td>
+                    <td>0</td>
+                    <td>操作成功</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>NVM_PARAM_ERR_PARAM</td>
+                    <td>-1</td>
+                    <td>参数指针为NULL</td>
+                    <td>检查调用代码</td>
+                </tr>
+                <tr>
+                    <td>NVM_PARAM_ERR_FLASH</td>
+                    <td>-2</td>
+                    <td>Flash操作失败</td>
+                    <td>检查Flash写保护或寿命</td>
+                </tr>
+                <tr>
+                    <td>NVM_PARAM_ERR_VERSION</td>
+                    <td>-3</td>
+                    <td>版本不匹配</td>
+                    <td>自动迁移（通常无需处理）</td>
+                </tr>
+                <tr>
+                    <td>NVM_PARAM_ERR_RANGE</td>
+                    <td>-4</td>
+                    <td>参数超出范围</td>
+                    <td>修正参数值或使用默认值</td>
+                </tr>
+                <tr>
+                    <td>NVM_PARAM_ERR_CRC</td>
+                    <td>-5</td>
+                    <td>CRC校验失败</td>
+                    <td>Flash数据损坏，恢复默认值</td>
+                </tr>
+            </table>
+        </section>
+
+        <!-- 使用示例 -->
+        <section>
+            <h2>💻 使用示例</h2>
+
+            <h3>示例1：初始化和读取参数</h3>
+            <div class="code-block">
+#include "nvm_param.h"
+
+int main(void) {
+    sensor_param_t config;
+    
+    /* 初始化参数模块 */
+    if (nvm_param_init() != NVM_PARAM_OK) {
+        printf("Param init failed\n");
+        return -1;
+    }
+    
+    /* 读取当前参数 */
+    if (nvm_param_read(&config) != NVM_PARAM_OK) {
+        printf("Param read failed\n");
+        return -1;
+    }
+    
+    /* 打印参数信息 */
+    nvm_param_print(&config);
+    
+    return 0;
+}
+            </div>
+
+            <h3>示例2：修改并保存参数</h3>
+            <div class="code-block">
+sensor_param_t config;
+
+/* 读取当前参数 */
+nvm_param_read(&config);
+
+/* 修改参数 */
+config.pls = 9;
+config.fine_gain = 650;
+config.sample_rate = 125;
+config.threshold_high = 60000;
+
+/* 保存到Flash（会自动验证） */
+int32_t ret = nvm_param_write(&config);
+if (ret == NVM_PARAM_OK) {
+    printf("Param saved successfully\n");
+} else {
+    printf("Save failed: %d\n", ret);
+}
+            </div>
+
+            <h3>示例3：恢复出厂设置</h3>
+            <div class="code-block">
+sensor_param_t config;
+
+/* 恢复出厂默认值 */
+int32_t ret = nvm_param_restore_factory(&config);
+if (ret == NVM_PARAM_OK) {
+    printf("Factory reset success\n");
+    nvm_param_print(&config);
+}
+            </div>
+
+            <h3>示例4：带验证的参数更新</h3>
+            <div class="code-block">
+sensor_param_t config;
+nvm_param_read(&config);
+
+/* 修改参数 */
+config.threshold_high = 70000;
+config.threshold_low = 15000;
+
+/* 验证参数有效性 */
+if (nvm_param_validate(&config) != NVM_PARAM_OK) {
+    printf("Parameter validation failed\n");
+    return;
+}
+
+/* 验证通过，保存 */
+nvm_param_write(&config);
+            </div>
+        </section>
+
+        <!-- 版本管理 -->
+        <section>
+            <h2>🔄 版本管理和参数迁移</h2>
+
+            <h3>版本升级流程</h3>
+            <ol>
+                <li>修改 <code>sensor_param_t</code> 结构体定义</li>
+                <li>更新 <code>FACTORY_DEFAULTS</code> 的默认值</li>
+                <li>增加 <code>NVM_PARAM_VERSION</code> 版本号</li>
+                <li>在 <code>nvm_param_version_migrate()</code> 中实现迁移逻辑</li>
+                <li>重新编译并烧录</li>
+            </ol>
+
+            <h3>版本迁移示例</h3>
+            <div class="code-block">
+/**
+ * 假设从版本1升级到版本2，新增了两个参数：
+ * - uint8_t temperature_offset
+ * - uint16_t pressure_offset
+ */
+int32_t nvm_param_version_migrate(uint32_t old_version, 
+                                  sensor_param_t *config)
+{
+    if (old_version == 1) {
+        /* 初始化新参数为默认值 */
+        config->temperature_offset = FACTORY_DEFAULTS.temperature_offset;
+        config->pressure_offset = FACTORY_DEFAULTS.pressure_offset;
+        PARAM_PRINTF("Migrated from v1 to v2\n");
+    }
+    return NVM_PARAM_OK;
+}
+            </div>
+
+            <div class="highlight-box">
+                <strong>⚠️ 版本管理注意事项：</strong><br>
+                1. 版本号只能向上递增，不能回退<br>
+                2. 新增参数必须提供默认值<br>
+                3. 删除参数时不要重用该字段，改用reserved<br>
+                4. 版本迁移必须保证向后兼容性
+            </div>
+        </section>
+
+        <!-- 掉电保护 -->
+        <section>
+            <h2>🛡️ 掉电保护机制</h2>
+
+            <h3>工作原理</h3>
+            <p>
+                基于底层Flash驱动的A/B页备份机制（详见 bsp_flash.c）。
+                参数管理层透明地使用这个机制，用户无需关心具体实现细节。
+            </p>
+
+            <h3>掉电安全保证</h3>
+            <table>
+                <tr>
+                    <th>掉电时刻</th>
+                    <th>系统状态</th>
+                    <th>恢复方案</th>
+                </tr>
+                <tr>
+                    <td>写入前</td>
+                    <td>A/B页都有旧数据</td>
+                    <td>加载旧配置（seq较大的页）</td>
+                </tr>
+                <tr>
+                    <td>写入中</td>
+                    <td>一页被擦除，另一页完整</td>
+                    <td>加载完整的那一页（掉电保护起效）</td>
+                </tr>
+                <tr>
+                    <td>验证中</td>
+                    <td>新页可能不完整</td>
+                    <td>CRC校验失败，自动加载另一页</td>
+                </tr>
+                <tr>
+                    <td>写入后</td>
+                    <td>新数据已写入并验证</td>
+                    <td>加载新配置</td>
+                </tr>
+            </table>
+
+            <div class="highlight-box">
+                <strong>💡 关键特性：</strong><br>
+                • 任何时刻掉电，至少有一页完整的有效数据<br>
+                • 使用seq序列号区分新旧页面<br>
+                • CRC校验检测数据是否完整<br>
+                • 写后验证确保数据正确性
+            </div>
+        </section>
+
+        <!-- 最佳实践 -->
+        <section>
+            <h2>🎯 最佳实践</h2>
+
+            <h3>参数设计建议</h3>
+            <ul>
+                <li><strong>合理分组：</strong>按功能或寄存器将相关参数组织在一起</li>
+                <li><strong>精确定义范围：</strong>每个参数必须有明确的最小值和最大值</li>
+                <li><strong>预留空间：</strong>在结构体中预留 reserved 字段用于未来扩展</li>
+                <li><strong>版本管理：</strong>参数结构变化时必须增加版本号</li>
+                <li><strong>默认值：</strong>出厂默认值应该是最稳定、最通用的配置</li>
+            </ul>
+
+            <h3>代码开发建议</h3>
+            <ul>
+                <li><strong>错误检查：</strong>每个API调用都应该检查返回值</li>
+                <li><strong>参数验证：</strong>修改参数后先验证再保存</li>
+                <li><strong>调试输出：</strong>修改参数后打印配置信息便于验证</li>
+                <li><strong>缓存利用：</strong>参数在RAM中缓存，减少Flash访问</li>
+                <li><strong>版本检查：</strong>项目启动时应该检查和处理版本迁移</li>
+            </ul>
+
+            <h3>测试建议</h3>
+            <ul>
+                <li>测试参数范围边界值（最小值、最大值、边界外）</li>
+                <li>测试参数逻辑约束（如高阈值 > 低阈值）</li>
+                <li>测试版本迁移（模拟参数结构变化）</li>
+                <li>测试掉电恢复（在写入过程中断电）</li>
+                <li>测试工厂恢复（验证出厂默认值是否正确）</li>
+            </ul>
+        </section>
+
+        <!-- 文件清单 -->
+        <section>
+            <h2>📁 项目文件清单</h2>
+
+            <h3>核心文件</h3>
+            <table>
+                <tr>
+                    <th>文件</th>
+                    <th>位置</th>
+                    <th>说明</th>
+                </tr>
+                <tr>
+                    <td><code>nvm_param.h</code></td>
+                    <td>BSP/inc/</td>
+                    <td>参数管理API和结构体定义</td>
+                </tr>
+                <tr>
+                    <td><code>nvm_param.c</code></td>
+                    <td>BSP/src/</td>
+                    <td>参数管理实现</td>
+                </tr>
+                <tr>
+                    <td><code>bsp_flash.h</code></td>
+                    <td>BSP/inc/</td>
+                    <td>Flash驱动API（已有）</td>
+                </tr>
+                <tr>
+                    <td><code>bsp_flash.c</code></td>
+                    <td>BSP/src/</td>
+                    <td>Flash驱动实现（已有）</td>
+                </tr>
+            </table>
+
+            <h3>集成步骤</h3>
+            <ol>
+                <li>将 <code>nvm_param.h</code> 和 <code>nvm_param.c</code> 复制到项目</li>
+                <li>在Keil工程中添加这两个文件到编译列表</li>
+                <li>在 main.c 中包含 <code>#include "nvm_param.h"</code></li>
+                <li>调用 <code>nvm_param_init()</code> 初始化模块</li>
+                <li>根据实际需求修改参数结构体和默认值</li>
+                <li>编译、烧录、测试</li>
+            </ol>
+        </section>
+    </div>
+
+    <footer>
+        <p>优化的NVM参数管理系统 | 设计基于 GD32C231 Flash驱动</p>
+        <p style="margin-top: 0.5rem; font-size: 0.9rem;">版本 1.0 | 2026年2月</p>
+    </footer>
+</body>
+</html>

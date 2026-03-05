@@ -1,0 +1,947 @@
+#include "user_flash.h"
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include "wtdint.h"
+
+#if APP
+#pragma arm section code = "RAMCODE"
+__IO s_reg_t g_sreg;
+#pragma arm section
+__IO uint16_t *g_rom = (uint16_t*)REG_ADDR;
+
+const reg_typ_t regTyp[kRegCnt] = {
+	[kRegRes0     ] = {kU16,  kMul1},
+	[kRegPeriod   ] = {kU16,  kMul1},
+	[kRegRes2     ] = {kU16,  kMul1},
+	[kRegNPN      ] = {kU16,  kMul1},
+	[kRegContinue ] = {kU16,  kMul1},
+	[kRegMod      ] = {kU16,  kMul1},
+	[kRegNONC1    ] = {kU16,  kMul1},
+	[kRegNONC2    ] = {kU16,  kMul1},
+	[kRegBpsEnum  ] = {kU16,  kMul1},
+	[kRegOut      ] = {kU16,  kMul1},
+	[kRegDiff     ] = {kS32,  kMulk},
+	[kRegIn       ] = {kU16,  kMul1},
+	[kRegDly      ] = {kU16,  kMul1},
+	[kRegDlyT     ] = {kU16,  kMul1},
+	[kRegDsp      ] = {kU16,  kMul1},
+	[kRegKeep     ] = {kU16,  kMul1},
+	[kRegScreen   ] = {kU16,  kMul1},
+	[kRegOffs     ] = {kS32,  kMulk},
+	[kRegBps      ] = {kU32,  kMul1},
+	[kRegAnalog   ] = {kU16,  kMul1},
+	[kRegLanguage ] = {kU16,  kMul1},
+	[kRegAddr     ] = {kU16,  kMul1},
+	[kRegRes25    ] = {kU16,  kMul1},
+	[kRegRes26    ] = {kU16,  kMul1},
+	[kRegGain     ] = {kU16,  kMul1},
+	[kRegRes28    ] = {kU16,  kMul1},
+	[kRegDspDir   ] = {kU16,  kMul1},
+	[kRegTolerance] = {kS32,  kMulk},
+
+	[kRegQ1Thr1   ] = {kS32,  kMulk},
+	[kRegQ1Thr2   ] = {kS32,  kMulk},
+	[kRegQ2Thr1   ] = {kS32,  kMulk},
+	[kRegQ2Thr2   ] = {kS32,  kMulk},
+
+	[kRegWTop     ] = {kFP32, kMul1},
+	[kRegWBtm     ] = {kFP32, kMul1},
+	[kRegRes64    ] = {kFP32, kMul1},
+	[kRegRes66    ] = {kFP32, kMul1},
+	[kRegRange    ] = {kU32,  kMul1},
+	[kRegMeasDst  ] = {kU32,  kMul1},
+	[kRegRes72    ] = {kFP32, kMul1},
+	[kRegRes74    ] = {kFP32, kMul1},
+	[kRegRes76    ] = {kFP32, kMul1},
+	[kRegRes78    ] = {kFP32, kMul1}, 
+	[kRegRes80    ] = {kFP32, kMul1},
+	[kRegRes82    ] = {kFP32, kMul1},
+	
+	[kRegPos      ] = {kFP32, kMul1},
+	[kRegDistSpd  ] = {kS32,  kMulk},
+	[kRegDistStd  ] = {kS32,  kMulk},
+	[kRegDistHi   ] = {kS32,  kMulk},
+	[kRegDist10   ] = {kS32,  kMulk},
+	[kRegDistDsp  ] = {kS32,  kMulk},
+	[kRegFlag     ] = {kU16,  kMul1},
+	[kRegReset    ] = {kU16,  kMul1},
+	[kRegRes104   ] = {kU16,  kMul1},
+	[kRegRes105   ] = {kU16,  kMul1},
+	[kRegZero     ] = {kU16,  kMul1},
+};
+
+s_reg_t sregDef = {
+	.period 	= 500u,
+	.npn    	= kNpn,
+	.contiune   = 0u,
+	.mod        = kModStandard,
+	.nonc1      = kNO,
+	.nonc2      = kNO,
+	.bpsEnum    = kBps115200,
+	.out        = kGenOut,
+	.diff		= 2u,
+	.in			= kInNone,
+	.dly		= kDlyOff,
+	.dlyT       = 0u,
+	.dsp        = kDpStandard,
+	.keep       = kKeepOn,
+	.screen     = kSrOn,
+	.offs       = 0u,
+	.bps        = 115200u,
+	.analog		= k4_20mA,
+	.language	= kChinese,
+	.addr		= 0x01,
+	.gain		= 0u,
+	.dspDir     = kDirFwd,
+	.tolerance	= 1000u,
+	
+	.q1thr1		= 0,
+	.q1thr2     = 0,
+	.q2thr1     = 0,
+	.q2thr2     = 0,
+	
+	.wtop		= 1530.0f,
+	.wbtm		= 50.0f,
+	.range		= 10000u,
+	.measDist	= 30000u,
+	
+	.pos		= 0.0f,
+	.distSpd	= 0,
+	.distStd	= 0,
+	.distHi		= 0,
+	.dist10 	= 0,
+	.distDsp	= 0,
+	.flag		= 0u,
+	.reset		= 0u,
+	.zero		= 0u
+};
+
+s_reg_t sregMax = {
+	.period 	= 10000u,
+	.npn    	= kPnp,
+	.contiune   = 1u,
+	.mod        = kModHiPrecise,
+	.nonc1      = kNC,
+	.nonc2      = kNC,
+	.bpsEnum    = kBps500000,
+	.out        = k3PTeach,
+	.diff		= 20000u,
+	.in			= kInLdOff,
+	.dly		= kSinglePulse,
+	.dlyT       = 1000u,
+	.dsp        = kDpOffs,
+	.keep       = kKeepOff,
+	.screen     = kSrTmoOff,
+	.offs       = 15350u,
+	.bps        = 500000u,
+	.analog		= k0_10V,
+	.language	= kEnglish,
+	.addr		= 0xff,
+	.gain       = 1u,
+	.dspDir     = kDirRes,
+	.tolerance	= 20000u,
+	
+	.q1thr1		= 20000,
+	.q1thr2     = 20000,
+	.q2thr1     = 20000,
+	.q2thr2     = 20000,
+	
+	.wtop		= 1535.0f,
+	.wbtm		= 700.0f,
+	.range		= 40000u,
+	.measDist	= 85000u,
+	
+	.pos		= 0.0f,
+	.distSpd	= 0,
+	.distStd	= 0,
+	.distHi		= 0,
+	.dist10 	= 0,
+	.distDsp	= 0,
+	.flag		= 0u,
+	.reset		= 1u,
+	.zero		= 1u
+};
+
+s_reg_t sregMin = {
+	.period 	= 500u,
+	.npn    	= kNpn,
+	.contiune   = 0u,
+	.mod        = kModStandard,
+	.nonc1      = kNO,
+	.nonc2      = kNO,
+	.bpsEnum    = kBps9600,
+	.out        = kGenOut,
+	.diff		= 0u,
+	.in			= kInNone,
+	.dly		= kDlyOff,
+	.dlyT       = 0u,
+	.dsp        = kDpStandard,
+	.keep       = kKeepOn,
+	.screen     = kSrOn,
+	.offs       = 0u,
+	.bps        = 9600u,
+	.analog		= k4_20mA,
+	.language	= kChinese,
+	.addr		= 0x01,
+	.gain       = 0u,
+	.dspDir     = kDirFwd,
+	.tolerance	= 0u,
+	
+	.q1thr1		= -20000,
+	.q1thr2     = -20000,
+	.q2thr1     = -20000,
+	.q2thr2     = -20000,
+	
+	.wtop		= 1435.0f,
+	.wbtm		= 0.0f,
+	.range		= 10000u,
+	.measDist	= 30000u,
+	
+	.pos		= 0.0f,
+	.distSpd	= 0,
+	.distStd	= 0,
+	.distHi		= 0,
+	.dist10 	= 0,
+	.distDsp	= 0,
+	.flag		= 0u,
+	.reset		= 0u,
+	.zero		= 0u
+};
+
+__IO uint16_t *g_reg = (uint16_t*)&g_sreg;
+uint16_t *regDef = (uint16_t*)&sregDef;
+uint16_t *regMax = (uint16_t*)&sregMax;
+uint16_t *regMin = (uint16_t*)&sregMin;
+
+__IO s_para_t g_spara;
+uint16_t *g_para  = (uint16_t*)&g_spara;
+__IO s_coef_t g_scoef;
+uint16_t *g_coef  = (uint16_t*)&g_scoef;
+#endif
+
+fmc_sector_info_struct FLASH_InfoGet(uint32_t addr)
+{
+	fmc_sector_info_struct sector_info;
+	uint32_t temp = 0x00000000U;
+	if ((FMC_START_ADDRESS <= addr) && (FMC_END_ADDRESS >= addr)) {
+		if ((FMC_BANK1_START_ADDRESS > addr)) {
+			/* bank0 area */
+			temp = (addr - FMC_BANK0_START_ADDRESS) / SIZE_16KB;
+			if (4U > temp) {
+				sector_info.sector_name = (uint32_t)temp;
+				sector_info.sector_num = CTL_SN(temp);
+				sector_info.sector_size = SIZE_16KB;
+				sector_info.sector_start_addr = FMC_BANK0_START_ADDRESS + (SIZE_16KB * temp);
+				sector_info.sector_end_addr = sector_info.sector_start_addr + SIZE_16KB - 1;
+			} else if (8U > temp) {
+				sector_info.sector_name = 0x00000004U;
+				sector_info.sector_num = CTL_SN(4);
+				sector_info.sector_size = SIZE_64KB;
+				sector_info.sector_start_addr = 0x08010000U;
+				sector_info.sector_end_addr = 0x0801FFFFU;
+			} else {
+				temp = (addr - FMC_BANK0_START_ADDRESS) / SIZE_128KB;
+				sector_info.sector_name = (uint32_t)(temp + 4);
+				sector_info.sector_num = CTL_SN(temp + 4);
+				sector_info.sector_size = SIZE_128KB;
+				sector_info.sector_start_addr = FMC_BANK0_START_ADDRESS + (SIZE_128KB * temp);
+				sector_info.sector_end_addr = sector_info.sector_start_addr + SIZE_128KB - 1;
+			}
+		} else {
+			/* bank1 area */
+			temp = (addr - FMC_BANK1_START_ADDRESS) / SIZE_16KB;
+			if (4U > temp) {
+				sector_info.sector_name = (uint32_t)(temp + 12);
+				sector_info.sector_num = CTL_SN(temp + 16);
+				sector_info.sector_size = SIZE_16KB;
+				sector_info.sector_start_addr = FMC_BANK0_START_ADDRESS + (SIZE_16KB * temp);
+				sector_info.sector_end_addr = sector_info.sector_start_addr + SIZE_16KB - 1;
+			} else if (8U > temp) {
+				sector_info.sector_name = 0x00000010;
+				sector_info.sector_num = CTL_SN(20);
+				sector_info.sector_size = SIZE_64KB;
+				sector_info.sector_start_addr = 0x08110000U;
+				sector_info.sector_end_addr = 0x0811FFFFU;
+			} else if (64U > temp) {
+				temp = (addr - FMC_BANK1_START_ADDRESS) / SIZE_128KB;
+				sector_info.sector_name = (uint32_t)(temp + 16);
+				sector_info.sector_num = CTL_SN(temp + 20);
+				sector_info.sector_size = SIZE_128KB;
+				sector_info.sector_start_addr = FMC_BANK1_START_ADDRESS + (SIZE_128KB * temp);
+				sector_info.sector_end_addr = sector_info.sector_start_addr + SIZE_128KB - 1;
+			} else {
+				temp = (addr - FMC_BANK1_START_ADDRESS) / SIZE_256KB;
+				sector_info.sector_name = (uint32_t)(temp + 20);
+				sector_info.sector_num = CTL_SN(temp + 8);
+				sector_info.sector_size = SIZE_256KB;
+				sector_info.sector_start_addr = FMC_BANK1_START_ADDRESS + (SIZE_256KB * temp);
+				sector_info.sector_end_addr = sector_info.sector_start_addr + SIZE_256KB - 1;
+			}
+		}
+	} else {
+		/* invalid address */
+		sector_info.sector_name = FMC_WRONG_SECTOR_NAME;
+		sector_info.sector_num = FMC_WRONG_SECTOR_NUM;
+		sector_info.sector_size = FMC_INVALID_SIZE;
+		sector_info.sector_start_addr = FMC_INVALID_ADDR;
+		sector_info.sector_end_addr = FMC_INVALID_ADDR;
+	}
+	return sector_info;
+}
+
+void FLASH_UserErase (uint32_t sectorNum)
+{
+	/* unlock the flash program/erase controller */
+	fmc_unlock();
+
+	/* clear all pending flags */
+	fmc_flag_clear(FMC_FLAG_END | FMC_FLAG_OPERR | FMC_FLAG_WPERR | FMC_FLAG_PGMERR | FMC_FLAG_PGSERR);
+
+	/* wait the erase operation complete*/
+	fmc_sector_erase(sectorNum);
+
+	/* clear all pending flags */
+	fmc_flag_clear(FMC_FLAG_END | FMC_FLAG_OPERR | FMC_FLAG_WPERR | FMC_FLAG_PGMERR | FMC_FLAG_PGSERR);
+
+	/* lock the main FMC after the erase operation */
+	fmc_lock();
+}
+
+void FLASH_UserWrite (uint32_t addr, uint32_t *buf, uint16_t size)
+{
+	uint16_t i;
+
+	/* unlock the flash program/erase controller */
+	fmc_unlock();
+
+	/* clear all pending flags */
+	fmc_flag_clear(FMC_FLAG_END | FMC_FLAG_OPERR | FMC_FLAG_WPERR | FMC_FLAG_PGMERR | FMC_FLAG_PGSERR);
+
+	/* program flash */
+	for (i = 0; i < size; i++) {
+		fmc_word_program(addr, buf[i]);
+		addr += 4;
+		/* clear all pending flags */
+		fmc_flag_clear(FMC_FLAG_END | FMC_FLAG_OPERR | FMC_FLAG_WPERR | FMC_FLAG_PGMERR | FMC_FLAG_PGSERR);
+	}
+
+	/* lock the main FMC after the program operation */
+	fmc_lock();
+}
+#if APP
+/* user function ---------------------------------------------------------*/
+static void FLASH_LoadData (uint32_t addr, uint16_t size, uint32_t buf)
+{
+	uint32_t i;
+	uint32_t *ptrd = (uint32_t*)addr;
+	uint32_t *reg32 = (uint32_t*)buf;
+
+	for (i = 0; i < size; i++) {
+		reg32[i] = ptrd[i];
+	}
+}
+
+void FLASH_RegWrite (void)
+{
+	__disable_irq();
+	FLASH_UserErase(CTL_SECTOR_NUMBER_1); /* sector 1 */
+	FLASH_UserWrite(REG_ADDR, (uint32_t*)g_reg, kRegCnt / 2);
+	__enable_irq();
+}
+
+void FLASH_ParaWrite (void)
+{
+	__disable_irq();
+	FLASH_UserErase(CTL_SECTOR_NUMBER_2); /* sector 2 */
+	FLASH_UserWrite(PARA_ADDR, (uint32_t*)g_para, sizeof(s_para_t) / 4);
+	__enable_irq();
+}
+
+void FLASH_CoefWrite (void)
+{
+	__disable_irq();
+	FLASH_UserErase(CTL_SECTOR_NUMBER_3); /* sector 3 */
+	FLASH_UserWrite(COEF_ADDR, (uint32_t*)g_coef, sizeof(s_coef_t) / 4);
+	__enable_irq();
+}
+
+/* reg operate function ----------------------------------- */
+const int32_t pow10[] = {1, 10, 100, 1000, 10000, 100000, 1000000};
+
+static int U16ToStr (uint16_t u16, char *str, int dot) 
+{
+	/* split */
+	int index = 0;
+	uint32_t start = 0;
+	uint16_t val = u16;
+	for (int i = 0; i < 5; i++) {
+		str[index] = val / pow10[4 - i] % 10 + '0';
+		if (dot) {
+			if (i == 4 - dot) {
+				start = 1;
+				str[++index] = '.';
+			}
+		}
+		if (str[index] > '0') {
+			start = 1;
+		}
+		index += start;
+	}
+
+	return 0;
+}
+
+static int S16ToStr ( int16_t s16, char *str, int dot)
+{
+	/* 1. negative handle */
+	int res = 0;
+	int index = 0;
+	uint16_t val;
+	if (s16 < 0) {
+		str[index++] = '-';
+		val = -s16;
+		res = 1;
+	} else {
+		val = s16;
+	}
+	/* 2. split */
+	U16ToStr(val, str + index, dot);
+
+	return res;
+}
+
+int U32ToStr (uint32_t u32, char *str, int dot)
+{
+	/* 1. over display range */
+	if (u32 > 999999) {
+		memset(str, '*', 5);
+		return -1;
+	} else if (u32 > 99999) {
+		u32 /= 10;
+		dot--;
+	}
+	/* 2. split */
+	int index = 0;
+	uint32_t start = 0;
+	uint32_t val = u32;
+	for (int i = 0; i < 6; i++) {
+		str[index] = val / pow10[5 - i] % 10 + '0';
+		if (dot) {
+			if (i == 5 - dot) {
+				start = 1;
+				str[++index] = '.';
+			}
+		}
+		if (str[index] > '0') {
+			start = 1;
+		}
+		index += start;
+	}
+
+	return 0;
+}
+
+int S32ToStr ( int32_t s32, char *str, int dot)
+{
+	/* 1. negative handle */
+	int res = 0;
+	int index = 0;
+	uint32_t val;
+	if (s32 < 0) {
+		str[index++] = '-';
+		val = -s32;
+		res = 1;
+	} else {
+		val = s32;
+	}
+	/* 2. split */
+	U32ToStr(val, str + index, dot);
+	return res;
+}
+
+int U32ToStr1 (uint32_t u32, char *str, int dot)
+{
+	/* 1. over display range */
+	if (u32 > 9999999) {
+		memset(str, '*', 5);
+		return -1;
+	} else if (u32 > 999999) {
+		u32 /= 10;
+		dot--;
+	}
+	/* 2. split */
+	int index = 0;
+	uint32_t start = 0;
+	uint32_t val = u32;
+
+	for (int i = 0; i < 7; i++) {
+		str[index] = val / pow10[6 - i] % 10 + '0';
+		if (dot) {
+			if (i == 6 - dot) {
+				start = 1;
+				str[++index] = '.';
+			}
+		}
+		if (str[index] > '0') {
+			start = 1;
+		}
+		index += start;
+	}
+
+	return 0;
+}
+
+int S32ToStr1 ( int32_t s32, char *str, int dot)
+{
+	/* 1. negative handle */
+	int res = 0;
+	int index = 0;
+	uint32_t val;
+	if (s32 < 0) {
+		str[index++] = '-';
+		val = -s32;
+		res = 1;
+	} else {
+		val = s32;
+	}
+	/* 2. split */
+	U32ToStr1(val, str + index, dot);
+	return res;
+}
+/* return isNeg 1/0/-1 -> neg/pos/err */
+int FLASH_GetIntRegStr (uint32_t index, char* str)
+{
+	memset(str, '\0', 8);
+
+	int dot = (regTyp[index].mt == kMulk) ? 3 : 0;
+	switch(regTyp[index].dt) {
+	case kS16: {
+		int16_t reg = *(int16_t*)(g_reg + index);
+		return S16ToStr(reg, str, dot);
+	};
+	case kU16: {
+		uint16_t reg = *(uint16_t*)(g_reg + index);
+		return U16ToStr(reg, str, dot);
+	};
+	case kS32: {
+		int32_t reg = *(int32_t*)(g_reg + index);
+		return S32ToStr(reg, str, dot);
+	};
+	case kU32: {
+		uint32_t reg = *(uint32_t*)(g_reg + index);
+		return U32ToStr(reg, str, dot);
+	};
+	default: {
+		return -1;
+	};
+	}
+}
+
+static void FLASH_SetReg (int index, uint16_t *src)
+{
+	switch(regTyp[index].dt) {
+	case kS16: 
+	case kU16: {
+		g_reg[index] = src[index];
+	} break;
+	
+	case kS32: case kU32: case kFP32: {
+		g_reg[index] = src[index];
+		g_reg[index + 1] = src[index + 1];
+	} break;
+	
+	default:;
+	}
+}
+
+void FLASH_RegSetMin (int index)
+{
+	FLASH_SetReg(index, regMin);
+}
+
+void FLASH_RegSetDef (int index)
+{
+	FLASH_SetReg(index, regDef);
+}
+
+void FLASH_RegReload (int index)
+{
+	FLASH_SetReg(index, (uint16_t*)g_rom);
+}
+
+void FLASH_RegSetMax (int index)
+{
+	FLASH_SetReg(index, regMax);
+}
+
+void FLASH_RegSetMid (int index)
+{
+	switch(regTyp[index].dt) {
+	case kS16: {
+		int16_t *reg = (int16_t*)(g_reg + index);
+		int16_t max  = *(regMax + index);
+		int16_t min  = *(regMin + index);
+		int16_t def  = *(regDef + index);
+		if ((def == max) || (def == min)) {
+			*reg = (max + min) / 2;
+		} else {
+			*reg = min;
+		}
+	} break;
+	
+	case kU16: {
+		uint16_t *reg = (uint16_t*)(g_reg + index);
+		uint16_t  max = *(regMax + index);
+		uint16_t  min = *(regMin + index);
+		uint16_t  def = *(regDef + index);
+		if ((def == max) || (def == min)) {
+			*reg = (max + min) / 2;
+		} else {
+			*reg = min;
+		}
+	} break;
+	
+	case kS32: {
+		int32_t *reg = (int32_t*)(g_reg  + index);
+		int32_t max = *(int32_t*)(regMax + index);
+		int32_t min = *(int32_t*)(regMin + index);
+		int32_t def = *(int32_t*)(regDef + index);
+		if ((def == max) || (def == min)) {
+			*reg = (max + min) / 2;
+		} else {
+			*reg = min;
+		}
+	} break;
+	
+	case kU32: {
+		uint32_t *reg = (uint32_t*)(g_reg  + index);
+		uint32_t max = *(uint32_t*)(regMax + index);
+		uint32_t min = *(uint32_t*)(regMin + index);
+		uint32_t def = *(uint32_t*)(regDef + index);
+		if ((def == max) || (def == min)) {
+			*reg = (max + min) / 2;
+		} else {
+			*reg = min;
+		}
+	} break;
+	
+	case kFP32: {			
+		fp32_t reg = {.buf16 = { g_reg[index],  g_reg[index + 1]}};				
+		fp32_t max = {.buf16 = {regMax[index], regMax[index + 1]}};
+		fp32_t min = {.buf16 = {regMin[index], regMin[index + 1]}};
+		if (isnan(reg.valf) || \
+		    (reg.valf == max.valf) || (reg.valf == min.valf)) {
+			g_reg[index] = (regMax[index] + regMin[index]) / 2;
+			g_reg[index + 1] = (regMax[index + 1] + regMin[index + 1]) / 2;
+		} else {
+			g_reg[index] = regMin[index];
+			g_reg[index + 1] = regMin[index + 1];
+		}
+	} break;
+	
+	default:;
+	}
+}
+
+static void FLASH_IntRegStep (int index, int step)
+{
+	switch(regTyp[index].dt) {
+	case kS16: {
+		(*(int16_t*)(g_reg + index)) += step;
+	} break;
+	case kU16: {
+		(*(uint16_t*)(g_reg + index)) += step;
+	} break;
+	case kS32: {
+		(*(int32_t*)(g_reg + index)) += step;
+	} break;
+	case kU32: {
+		(*(uint32_t*)(g_reg + index)) += step;
+	} break;
+	
+	default:;
+	}
+}
+
+void FLASH_IntRegAdd (int index)
+{
+	FLASH_IntRegStep(index, 1);
+}
+
+void FLASH_IntRegSub (int index)
+{
+	FLASH_IntRegStep(index, -1);
+}
+
+int  FLASH_RegMaxChk (int index)
+{
+	switch(regTyp[index].dt) {
+	case kS16: {
+		int16_t reg = *(g_reg + index);
+		int16_t max = *(regMax + index);
+		if (reg >= max) {
+			return 0;
+		}
+	} break;
+		
+	case kU16: {
+		uint16_t reg = *(g_reg + index);
+		uint16_t max = *(regMax + index);
+		if (reg >= max) {
+			return 0;
+		}
+	} break;
+	
+	case kS32: {
+		int32_t reg = *(int32_t*)(g_reg + index);
+		int32_t max = *(int32_t*)(regMax + index);
+		if (reg >= max) {
+			return 0;
+		}
+	} break;
+	
+	case kU32: {
+		uint32_t reg = *(uint32_t*)(g_reg + index);
+		uint32_t max = *(uint32_t*)(regMax + index);
+		if (reg >= max) {
+			return 0;
+		}
+	} break;
+		
+	case kFP32: {
+		fp32_t reg = {.buf16 = {g_reg[index], g_reg[index + 1]}};
+		fp32_t max = {.buf16 = {regMax[index], regMax[index + 1]}};
+		if (isnan(reg.valf) || reg.valf >= max.valf) {
+			return 0;
+		}
+	} break;
+	}
+
+	return 1;
+}
+
+int  FLASH_RegMinChk (int index)
+{
+	switch(regTyp[index].dt) {
+	case kS16: {
+		int16_t reg = *(g_reg + index);
+		int16_t min = *(regMin + index);
+		if (reg <= min) {
+			return 0;
+		}
+	} break;
+	
+	case kU16: {
+		uint16_t reg = *(g_reg + index);
+		uint16_t min = *(regMin + index);
+		if (reg <= min) {
+			return 0;
+		}
+	} break;
+	
+	case kS32: {
+		int32_t reg = *(int32_t*)(g_reg + index);
+		int32_t min = *(int32_t*)(regMin + index);
+		if (reg <= min) {
+			return 0;
+		}
+	} break;
+	
+	case kU32: {
+		uint32_t reg = *(uint32_t*)(g_reg + index);
+		uint32_t min = *(uint32_t*)(regMin + index);
+		if (reg <= min) {
+			return 0;
+		}
+	} break;
+	
+	case kFP32: {
+		fp32_t reg = {.buf16 = {g_reg[index], g_reg[index + 1]}};
+		fp32_t min = {.buf16 = {regMin[index], regMin[index + 1]}};
+		if (isnan(reg.valf) || reg.valf <= min.valf) {
+			return 0;
+		}
+	} break;
+	}
+
+	return 1;
+}
+
+static int  FLASH_RegsChk (int start, int cnt)
+{
+	int modify = 0;
+
+	for (int i = start; i < cnt; ) {
+		switch(regTyp[i].dt) {
+		case kS16: {
+			int16_t *reg = (int16_t*)(g_reg + i);
+			int16_t max  = *(regMax + i);
+			int16_t min  = *(regMin + i);
+			int16_t def  = *(regDef + i);
+			if ((*reg > max) || (*reg < min)) {
+				*reg = def;
+				modify = 1;
+			}
+			i++;
+		} break;
+		
+		case kU16: {
+			uint16_t *reg = (uint16_t*)(g_reg + i);
+			uint16_t  max = *(regMax + i);
+			uint16_t  min = *(regMin + i);
+			uint16_t  def = *(regDef + i);
+			if ((*reg > max) || (*reg < min)) {
+				*reg = def;
+				modify = 1;
+			}
+			i++;
+		} break;
+		
+		case kS32: {
+			int32_t *reg = (int32_t*)(g_reg  + i);
+			int32_t max = *(int32_t*)(regMax + i);
+			int32_t min = *(int32_t*)(regMin + i);
+			int32_t def = *(int32_t*)(regDef + i);
+			if ((*reg > max) || (*reg < min)) {
+				*reg = def;
+				modify = 1;
+			}
+			i += 2;
+		} break;
+		
+		case kU32: {
+			uint32_t *reg = (uint32_t*)(g_reg  + i);
+			uint32_t max = *(uint32_t*)(regMax + i);
+			uint32_t min = *(uint32_t*)(regMin + i);
+			uint32_t def = *(uint32_t*)(regDef + i);
+			if ((*reg > max) || (*reg < min)) {
+				*reg = def;
+				modify = 1;
+			}
+			i += 2;
+		} break;
+		
+		case kFP32: {			
+			fp32_t reg = {.buf16 = { g_reg[i],  g_reg[i + 1]}};				
+			fp32_t max = {.buf16 = {regMax[i], regMax[i + 1]}};
+			fp32_t min = {.buf16 = {regMin[i], regMin[i + 1]}};
+			if (isnan(reg.valf) || \
+			    (reg.valf > max.valf) || (reg.valf < min.valf)) {
+				g_reg[i] = regDef[i];
+				g_reg[i + 1] = regDef[i + 1];
+				modify = 1;
+			}
+			i += 2;
+		} break;
+		
+		default:;
+		}
+	}
+
+	return modify;
+}
+
+void FLASH_RegLoadChk (void)
+{
+	int32_t modify = 0;
+
+	FLASH_LoadData(REG_ADDR, kRegCnt / 2, (uint32_t)g_reg);
+	g_reg[kRegFlag    ] = 0;
+	g_reg[kRegReset   ] = 1u;
+	g_reg[kRegZero    ] = 0;
+
+	if (FLASH_RegsChk(kRegRes0, kRegSetCnt)) {
+		modify = 1;
+	}
+	if (FLASH_RegsChk(kRegQ1Thr1, kRegThrCnt)) {
+		modify = 1;
+	}
+	if (FLASH_RegsChk(kRegWTop, kRegPosCnt)) {
+		modify = 1;
+	}
+
+	if (modify) {
+		SetFlag(kFlagWriteReg);
+	}
+}
+
+static void ParaCheck (void) 
+{
+	/* type check */
+	uint8_t* type = &((*(u32_t*)(&g_spara.flag)).buf[0]);
+	if ((*type <= 0) || (*type > 3)) {
+		*type = 1;
+		SetFlag(kFlagWritePara);
+	}
+	
+	/* offs10 check */
+	if ((g_spara.offs10 > 10000) || (g_spara.offs10 < -10000)) {
+		g_spara.offs10 = 0;
+		SetFlag(kFlagWritePara);
+	}
+}
+
+void FLASH_ParaLoadChk (void)
+{
+	FLASH_LoadData(PARA_ADDR, sizeof(s_para_t) / 4, (uint32_t)g_para);
+	ParaCheck();
+}
+
+static void CoefCheck (void)
+{
+	for (int i = 0; i < PN; i++) {
+		if (isnan(g_scoef.a[i])) {
+			// ...
+		}
+		if (isnan(g_scoef.b[i])) {
+			// ...
+		}
+		if (isnan(g_scoef.c[i])) {
+			// ...
+		}
+		if (isnan(g_scoef.d[i])) {
+			// ...
+		}
+	}
+
+//	SetFlag(kFlagWriteCoef);
+}
+
+void FLASH_CoefLoadChk (void)
+{
+	FLASH_LoadData(COEF_ADDR, sizeof(s_coef_t) / 4, (uint32_t)g_coef);
+	CoefCheck();
+}
+/* -----------------------------------------------------------------------*/
+static void FLASH_RegsReset (int start, int cnt)
+{
+	for (int i = start; i < cnt; i++) {
+		g_reg[i] = regDef[i];
+	}
+}
+
+void FLASH_RegReinit (void)
+{
+	FLASH_RegsReset(kRegRes0, kRegSetCnt);
+	FLASH_RegsReset(kRegQ1Thr1, kRegThrCnt);
+//	FLASH_RegsReset(kRegWTop, kRegPosCnt);
+	FLASH_RegWrite();
+}
+
+inline bool ChkFlag (flag_t flag)
+{
+	return (0 != (g_reg[kRegFlag] & (1 << flag)));
+}
+
+inline void SetFlag (flag_t flag)
+{
+	g_reg[kRegFlag] |= (1 << flag);
+}
+
+inline void ClrFlag (flag_t flag)
+{
+	g_reg[kRegFlag] &= ~(1 << flag);
+}
+/* -------------------------------------------------------- */
+#endif

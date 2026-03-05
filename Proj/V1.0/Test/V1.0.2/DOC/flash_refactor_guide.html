@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flash参数存储架构重构指南</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.7;
+            color: #1d1d1f;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            font-size: 16px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 50px 60px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+        }
+        
+        .subtitle {
+            font-size: 18px;
+            opacity: 0.95;
+            font-weight: 400;
+        }
+        
+        .content {
+            padding: 50px 60px;
+        }
+        
+        h2 {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 50px 0 25px;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        h2:first-child {
+            margin-top: 0;
+        }
+        
+        h3 {
+            font-size: 22px;
+            font-weight: 600;
+            margin: 35px 0 20px;
+            color: #333;
+        }
+        
+        h4 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 25px 0 15px;
+            color: #555;
+        }
+        
+        p {
+            margin-bottom: 18px;
+            color: #444;
+        }
+        
+        ul, ol {
+            margin: 15px 0 25px 25px;
+            color: #444;
+        }
+        
+        li {
+            margin: 10px 0;
+            padding-left: 8px;
+        }
+        
+        code {
+            background: #f6f8fa;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 14px;
+            color: #d73a49;
+            border: 1px solid #e1e4e8;
+        }
+        
+        pre {
+            background: #f6f8fa;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-x: auto;
+            margin: 20px 0;
+            border: 1px solid #e1e4e8;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        pre code {
+            background: none;
+            padding: 0;
+            border: none;
+            color: #24292e;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .diagram {
+            background: #f9fafb;
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            font-family: monospace;
+            white-space: pre;
+            overflow-x: auto;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+        
+        .note {
+            background: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+        }
+        
+        .warning {
+            background: #f8d7da;
+            border-left: 5px solid #dc3545;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
+        }
+        
+        .success {
+            background: #d4edda;
+            border-left: 5px solid #28a745;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #e1e4e8;
+            color: #444;
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        
+        .api-card {
+            background: white;
+            border: 2px solid #e1e4e8;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .api-card:hover {
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
+            border-color: #667eea;
+        }
+        
+        .checklist {
+            list-style: none;
+            margin: 20px 0;
+        }
+        
+        .checklist li {
+            padding: 12px 0;
+            padding-left: 35px;
+            position: relative;
+        }
+        
+        .checklist li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #28a745;
+            font-weight: bold;
+            font-size: 20px;
+        }
+        
+        footer {
+            background: #f9fafb;
+            padding: 40px 60px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #e1e4e8;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+        
+        .badge-blue {
+            background: #e7f0ff;
+            color: #0052cc;
+        }
+        
+        .badge-green {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-red {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        hr {
+            border: none;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #e1e4e8, transparent);
+            margin: 40px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📦 Flash参数存储架构重构指南</h1>
+            <p class="subtitle">驱动层与应用层分离 · 双页Ping-Pong备份 · 完整校验机制</p>
+        </header>
+        
+        <div class="content">
+            <h2>📋 概述</h2>
+            <p>本次重构将Flash操作分为<strong>驱动层</strong>和<strong>应用层</strong>,实现职责分离：</p>
+            <ul>
+                <li><strong>驱动层（bsp_flash）</strong>：通用Flash读写擦除,无业务限制</li>
+                <li><strong>应用层（task_flash）</strong>：参数存储策略（双页备份、CRC校验、版本管理）</li>
+            </ul>
+
+            <hr>
+
+            <h2>🏗️ 架构设计</h2>
+            <h3>分层架构图</h3>
+            <div class="diagram">┌─────────────────────────────────────────────────┐
+│         应用层（task_flash）                     │
+│  · 双页Ping-Pong存储                             │
+│  · Magic + CRC32校验                             │
+│  · 序列号版本管理                                │
+│  · 参数加载/保存策略                             │
+└─────────────────┬───────────────────────────────┘
+                  │ 调用
+┌─────────────────▼───────────────────────────────┐
+│         驱动层（bsp_flash）                      │
+│  · 擦除任意页                                    │
+│  · 写入任意地址（8字节对齐）                     │
+│  · 读取Flash                                     │
+│  · CRC32工具                                     │
+│  · 写后校验                                      │
+└─────────────────────────────────────────────────┘</div>
+
+            <hr>
+
+            <h2>🔧 驱动层 API（bsp_flash）</h2>
+            
+            <div class="api-card">
+                <h4>1. 擦除页</h4>
+                <pre><code>bool BSP_Flash_ErasePage(uint32_t page_index);</code></pre>
+                <ul>
+                    <li><strong>功能</strong>：擦除指定页（通用接口,无业务限制）</li>
+                    <li><strong>参数</strong>：<code>page_index</code> - 页号（0-63）</li>
+                    <li><strong>返回</strong>：<code>true</code>=成功, <code>false</code>=失败</li>
+                    <li class="warning"><strong>注意</strong>：调用者需确保页号有效（如避免擦除程序区）</li>
+                </ul>
+            </div>
+
+            <div class="api-card">
+                <h4>2. 写入数据</h4>
+                <pre><code>bool BSP_Flash_Write(uint32_t addr, const uint8_t *data, uint32_t len);</code></pre>
+                <ul>
+                    <li><strong>功能</strong>：写入数据到Flash</li>
+                    <li><strong>参数</strong>：
+                        <ul>
+                            <li><code>addr</code> - 目标地址（<strong>必须8字节对齐</strong>）</li>
+                            <li><code>data</code> - 源数据缓冲区</li>
+                            <li><code>len</code> - 数据长度（自动补齐到8字节倍数）</li>
+                        </ul>
+                    </li>
+                    <li><strong>返回</strong>：<code>true</code>=成功, <code>false</code>=失败</li>
+                </ul>
+            </div>
+
+            <div class="api-card">
+                <h4>3. 读取数据</h4>
+                <pre><code>void BSP_Flash_Read(uint32_t addr, uint8_t *data, uint32_t len);</code></pre>
+                <ul>
+                    <li><strong>功能</strong>：从Flash读取数据</li>
+                </ul>
+            </div>
+
+            <div class="api-card">
+                <h4>4. 写后校验</h4>
+                <pre><code>bool BSP_Flash_Verify(uint32_t addr, const uint8_t *data, uint32_t len);</code></pre>
+                <ul>
+                    <li><strong>功能</strong>：验证Flash内容与期望数据是否一致</li>
+                    <li class="success"><strong>推荐</strong>：每次写入后调用,确保数据完整性</li>
+                </ul>
+            </div>
+
+            <div class="api-card">
+                <h4>5. CRC32校验</h4>
+                <pre><code>uint32_t BSP_Flash_CRC32(const uint8_t *data, uint32_t len);</code></pre>
+                <ul>
+                    <li><strong>功能</strong>：计算标准CRC32校验和</li>
+                </ul>
+            </div>
+
+            <hr>
+
+            <h2>📦 应用层 API（task_flash）</h2>
+            
+            <h3>核心接口（4个）</h3>
+
+            <div class="api-card">
+                <h4>1. 参数初始化</h4>
+                <pre><code>void Param_Init(void);</code></pre>
+                <ul>
+                    <li><strong>功能</strong>：上电时调用,从Flash加载参数到RAM</li>
+                    <li><strong>策略</strong>：
+                        <ul>
+                            <li>从A/B页读取记录</li>
+                            <li>使用Magic + CRC32校验有效性</li>
+                            <li>两页都有效 → 选序列号更大的</li>
+                            <li>都无效 → 使用默认参数（<code>PARAM_CONFIG_USER</code>）</li>
+                        </ul>
+                    </li>
+                    <li><strong>调用时机</strong>：<code>main()</code>中的<code>Task_Init()</code></li>
+                </ul>
+            </div>
+
+            <div class="api-card">
+                <h4>2. 获取参数（只读）</h4>
+                <pre><code>const param_config_t* Param_Get(void);</code></pre>
+                <ul>
+                    <li><strong>功能</strong>：获取当前参数指针</li>
+                    <li><strong>返回</strong>：指向<code>g_param_cfg</code>的常量指针</li>
+                    <li><strong>用法</strong>：
+<pre><code>const param_config_t *cfg = Param_Get();
+uint16_t v_set = cfg->app.v_set;</code></pre>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="api-card">
+                <h4>3. 设置参数</h4>
+                <pre><code>void Param_Set(const param_config_t *cfg);</code></pre>
+                <ul>
+                    <li><strong>功能</strong>：整体覆盖当前参数（仅修改RAM）</li>
+                    <li class="note"><strong>注意</strong>：需手动调用<code>Param_Save()</code>才写入Flash</li>
+                    <li><strong>用法</strong>：
+<pre><code>param_config_t new_cfg = *Param_Get();
+new_cfg.app.v_set = 450;
+Param_Set(&new_cfg);
+Param_Save();  // 保存到Flash</code></pre>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="api-card">
+                <h4>4. 保存参数</h4>
+                <pre><code>bool Param_Save(void);</code></pre>
+                <ul>
+                    <li><strong>功能</strong>：保存当前参数到Flash</li>
+                    <li><strong>返回</strong>：<code>true</code>=成功, <code>false</code>=失败</li>
+                    <li><strong>机制</strong>：
+                        <ul>
+                            <li>自动Ping-Pong写入另一个页</li>
+                            <li>递增序列号（<code>seq++</code>）</li>
+                            <li>写后读回校验</li>
+                            <li>更新内部状态</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <hr>
+
+            <h2>💾 存储结构</h2>
+            
+            <h3>Flash布局</h3>
+            <pre><code>Page 62 (0x0800F800)  ─┐
+                       ├─ A/B双页备份
+Page 63 (0x0800FC00)  ─┘</code></pre>
+
+            <h3>记录格式</h3>
+            <pre><code>typedef struct {
+    param_header_t   header;   // 16字节
+    param_config_t   config;   // 21字节（isl700_config_t 15B + app_config_t 6B）
+} param_record_t;  // 总计37字节</code></pre>
+
+            <h3>头部结构</h3>
+            <pre><code>typedef struct {
+    uint32_t magic;         // 魔数：0x48503650 ("HP6P")
+    uint32_t seq;           // 序列号（递增）
+    uint16_t payload_len;   // 载荷长度：21
+    uint16_t reserved;      // 保留字段
+    uint32_t crc32;         // payload的CRC32
+} param_header_t;</code></pre>
+
+            <hr>
+
+            <h2>📖 使用示例</h2>
+
+            <h3>示例1：上电初始化</h3>
+            <pre><code>int main(void)
+{
+    BSP_Init();
+    Task_Init();  // 内部调用 Param_Init()
+    
+    // 参数已加载到 g_param_cfg
+    ISL700_Init(&g_param_cfg.isl700);
+    
+    while (1) {
+        // 主循环
+    }
+}</code></pre>
+
+            <h3>示例2：读取参数</h3>
+            <pre><code>void OutputTask(void)
+{
+    const param_config_t *cfg = Param_Get();
+    uint16_t v_set = cfg->app.v_set;
+    uint16_t v_hys = cfg->app.v_hys;
+    
+    if (V_OUT >= v_set) {
+        // 物体检测逻辑
+    }
+}</code></pre>
+
+            <h3>示例3：修改并保存参数</h3>
+            <pre><code>void UpdateThreshold(uint16_t new_vset)
+{
+    // 方式1：直接修改全局变量
+    g_param_cfg.app.v_set = new_vset;
+    
+    // 保存到Flash
+    if (Param_Save()) {
+        printf("参数保存成功\r\n");
+    } else {
+        printf("参数保存失败\r\n");
+    }
+}</code></pre>
+
+            <hr>
+
+            <h2>🔄 Ping-Pong机制详解</h2>
+            
+            <h3>工作原理</h3>
+            <pre><code>初始状态：Page A有效（seq=1）, Page B空
+
+第1次保存：
+  - 写入 Page B (seq=2)
+  - 现在 A=seq1, B=seq2 ✅
+
+第2次保存：
+  - 写入 Page A (seq=3)
+  - 现在 A=seq3 ✅, B=seq2
+
+第3次保存：
+  - 写入 Page B (seq=4)
+  - 现在 A=seq3, B=seq4 ✅</code></pre>
+
+            <h3>掉电保护</h3>
+            <div class="success">
+                <h4>场景1：写入中掉电</h4>
+                <p>目标页部分写入（Magic或CRC校验失败）<br>
+                → 上电后从另一页恢复 ✅</p>
+                
+                <h4>场景2：擦除中掉电</h4>
+                <p>目标页全FF（无Magic）<br>
+                → 上电后从另一页恢复 ✅</p>
+                
+                <h4>场景3：写入完成但未更新状态</h4>
+                <p>两页都有效，选seq更大的 ✅</p>
+            </div>
+
+            <hr>
+
+            <h2>⚙️ 配置参数</h2>
+            
+            <h3>页号配置（task_flash.h）</h3>
+            <pre><code>#define PARAM_PAGE_A    62U
+#define PARAM_PAGE_B    63U</code></pre>
+
+            <h3>魔数配置</h3>
+            <pre><code>#define PARAM_MAGIC     0x48503650UL  // "HP6P"</code></pre>
+
+            <hr>
+
+            <h2>📊 性能指标</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>操作</th>
+                        <th>时间</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>Param_Init()</code></td>
+                        <td>~10ms</td>
+                        <td>读取两页 + 校验</td>
+                    </tr>
+                    <tr>
+                        <td><code>Param_Save()</code></td>
+                        <td>~50ms</td>
+                        <td>擦除 + 写入 + 校验</td>
+                    </tr>
+                    <tr>
+                        <td><code>Param_Get()</code></td>
+                        <td>&lt;1μs</td>
+                        <td>直接返回指针</td>
+                    </tr>
+                    <tr>
+                        <td><code>Param_Set()</code></td>
+                        <td>&lt;1ms</td>
+                        <td>内存拷贝</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <hr>
+
+            <h2>⚠️ 注意事项</h2>
+            
+            <h3>驱动层</h3>
+            <ul class="checklist">
+                <li><strong>地址对齐</strong>：<code>BSP_Flash_Write()</code>必须8字节对齐</li>
+                <li><strong>页号检查</strong>：<code>BSP_Flash_ErasePage()</code>仅检查物理范围（0-63）</li>
+                <li><strong>写后校验</strong>：强烈建议每次写入后调用<code>BSP_Flash_Verify()</code></li>
+            </ul>
+
+            <h3>应用层</h3>
+            <ul class="checklist">
+                <li><strong>初始化顺序</strong>：<code>Param_Init()</code>必须在使用<code>g_param_cfg</code>前调用</li>
+                <li><strong>保存时机</strong>：修改参数后需手动调用<code>Param_Save()</code></li>
+                <li><strong>序列号溢出</strong>：使用有符号差值比较,支持溢出（假设不会相差&gt;2^31）</li>
+                <li><strong>RAM修改</strong>：可直接修改<code>g_param_cfg</code>,但需调用<code>Param_Save()</code>持久化</li>
+            </ul>
+
+            <hr>
+
+            <h2>✅ 重构检查清单</h2>
+            <ul class="checklist">
+                <li>bsp_flash驱动层：去掉业务限制（Page A/B限制）</li>
+                <li>bsp_flash驱动层：改用bool返回值</li>
+                <li>bsp_flash驱动层：添加BSP_Flash_Verify()</li>
+                <li>task_flash应用层：实现双页Ping-Pong</li>
+                <li>task_flash应用层：Magic + CRC32校验</li>
+                <li>task_flash应用层：序列号版本管理</li>
+                <li>task_flash应用层：简洁的4个API</li>
+                <li>main.c：移除g_param_cfg本地初始化</li>
+                <li>task.c：Task_Init()中调用Param_Init()</li>
+                <li>文档：使用指南和设计说明</li>
+            </ul>
+
+            <hr>
+
+            <h2>🔗 相关文件</h2>
+            <ul>
+                <li><code>BSP/inc/bsp_flash.h</code> - 驱动层头文件</li>
+                <li><code>BSP/src/bsp_flash.c</code> - 驱动层实现</li>
+                <li><code>App/inc/task_flash.h</code> - 应用层头文件</li>
+                <li><code>App/src/task_flash.c</code> - 应用层实现</li>
+                <li><code>App/inc/param_config.h</code> - 参数结构定义</li>
+                <li><code>App/src/main.c</code> - 主程序</li>
+                <li><code>App/src/task.c</code> - 任务初始化</li>
+            </ul>
+        </div>
+
+        <footer>
+            <p><strong>作者</strong>: 系统架构设计 | <strong>版本</strong>: V1.0.2 | <strong>日期</strong>: 2026年2月28日</p>
+        </footer>
+    </div>
+</body>
+</html>

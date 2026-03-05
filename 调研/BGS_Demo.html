@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BGS Triangulation Dual-PD (v2)</title>
+  <style>
+    :root{
+      --bg0:#060914;
+      --bg1:#0b1220;
+      --card:rgba(255,255,255,.05);
+      --stroke:rgba(255,255,255,.12);
+      --text:#e5e7eb;
+      --muted:#93a4b8;
+
+      --yellow:#fbbf24; /* target */
+      --blue:#60a5fa;   /* LD / rays */
+      --green:#34d399;  /* return / spot */
+      --cyan:#22d3ee;
+      --pink:#fb7185;   /* blind */
+      --orange:#f59e0b; /* range */
+
+      --shadow:0 18px 60px rgba(0,0,0,.45);
+      --r:16px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",Roboto,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+      background: radial-gradient(1200px 700px at 25% -10%, #111827 0%, var(--bg1) 55%, var(--bg0) 100%);
+    }
+    .wrap{
+      max-width:1240px;
+      margin:0 auto;
+      padding:16px 14px 22px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:12px;
+    }
+    .title{font-weight:850; letter-spacing:-.2px; font-size:18px;}
+    .sub{margin-top:4px; color:var(--muted); font-size:13px; line-height:1.45; max-width:980px;}
+    .pills{display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;}
+    .pill{
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.04);
+      color:var(--muted);
+      font-size:13px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+      white-space:nowrap;
+    }
+    .dot{width:10px;height:10px;border-radius:999px;background:var(--muted)}
+    .card{
+      border-radius:var(--r);
+      border:1px solid var(--stroke);
+      background: linear-gradient(180deg, rgba(255,255,255,.06) 0%, rgba(255,255,255,.03) 100%);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .stage{
+      padding:12px;
+      display:grid;
+      grid-template-columns: 1.28fr 0.72fr;
+      gap:12px;
+      align-items:stretch;
+    }
+    .box{padding:12px;}
+    .boxTitle{font-size:13.5px; font-weight:850; margin-bottom:6px;}
+    .hint{color:var(--muted); font-size:12.5px; line-height:1.55;}
+    .canvasBox{
+      border-radius:14px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.10);
+      background: radial-gradient(900px 450px at 20% 10%, rgba(96,165,250,.10) 0%, rgba(15,23,42,1) 55%, rgba(8,12,24,1) 100%);
+    }
+    #mainBox{height:580px;}
+    #topBox{height:270px;}
+    canvas{width:100%; height:100%; display:block;}
+    input[type="range"]{width:100%; accent-color: var(--blue);}
+    .row{display:flex; justify-content:space-between; align-items:center; gap:10px; color:var(--muted); font-size:13px;}
+    .row b{color:var(--text); font-weight:850}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <div class="title">三角测距 / BGS（双PD）交互示意</div>
+      <div class="sub">
+        设定：<b>远→近</b> 光斑在 PD 上<b>从上到下</b>移动（先过B再到A）。拖动主视图黄色目标面，观察光路与光斑移动。
+      </div>
+    </div>
+    <div class="pills">
+      <div class="pill"><span class="dot" id="stateDot"></span><span id="stateTxt">—</span></div>
+      <div class="pill">d: <b id="dTxt" style="color:var(--text)">—</b> mm</div>
+      <div class="pill">spot(u): <b id="uTxt" style="color:var(--text)">—</b></div>
+    </div>
+  </div>
+
+  <div class="card stage">
+    <div class="canvasBox" id="mainBox">
+      <canvas id="main"></canvas>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div class="card box">
+        <div class="boxTitle">双PD俯视图（Top view）</div>
+        <div class="hint">B（大，上）/ A（小，下）+ gap；光斑远→近从上到下移动。</div>
+        <div class="canvasBox" id="topBox" style="margin-top:8px;">
+          <canvas id="top"></canvas>
+        </div>
+      </div>
+
+      <div class="card box">
+        <div class="boxTitle">距离控制</div>
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+          <div class="row">
+            <span>目标距离 <b>d</b>（盲区10mm，量程300mm）</span>
+            <span><b id="dTxt2">—</b> mm</span>
+          </div>
+          <input id="dSlider" type="range" min="0" max="350" step="1" value="220" />
+          <div class="hint">拖动主视图黄色竖线可改变距离。</div>
+        </div>
+      </div>
+
+      <div class="card box">
+        <div class="boxTitle">读数（示意）</div>
+        <div class="hint" id="readout">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // -------- Config --------
+  const cfg = {
+    blind: 10,
+    rangeMax: 300,
+    TH: 0.10,
+
+    // PD geometry ratios
+    A_len: 0.80,
+    B_len: 1.96,
+    gap: 0.005,
+
+    // Gaussian width on [0..1]
+    sigma: 0.155,
+
+    // Distance -> normalized spot position u (0 top, 1 bottom), far->near => top->bottom
+    spotU(d){
+      const dd = Math.max(cfg.blind, Math.min(cfg.rangeMax, d));
+      return (cfg.rangeMax - dd) / (cfg.rangeMax - cfg.blind);
+    }
+  };
+
+  // -------- DOM --------
+  const main = document.getElementById('main');
+  const topc = document.getElementById('top');
+  const mainBox = document.getElementById('mainBox');
+  const topBox = document.getElementById('topBox');
+
+  const dSlider = document.getElementById('dSlider');
+  const dTxt = document.getElementById('dTxt');
+  const dTxt2 = document.getElementById('dTxt2');
+  const uTxt = document.getElementById('uTxt');
+  const stateTxt = document.getElementById('stateTxt');
+  const stateDot = document.getElementById('stateDot');
+  const readout = document.getElementById('readout');
+
+  // -------- HiDPI setup --------
+  function setupCanvas(canvas, container){
+    const dpr = window.devicePixelRatio || 1;
+    const rect = container.getBoundingClientRect();
+    canvas.width  = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return ctx;
+  }
+
+  let g, t;
+  function resize(){
+    g = setupCanvas(main, mainBox);
+    t = setupCanvas(topc, topBox);
+    render();
+  }
+  window.addEventListener('resize', resize);
+
+  // -------- Draw helpers --------
+  function line(ctx, x1,y1,x2,y2, col, w=2, dash=null, alpha=1){
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = w;
+    ctx.lineCap = "round";
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x2,y2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function circle(ctx, x,y,r, col, alpha=1){
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+  function text(ctx, s, x,y, col, size=12, align="left", alpha=1){
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = col;
+    ctx.font = `${size}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Microsoft YaHei", Arial`;
+    ctx.textAlign = align;
+    ctx.fillText(s, x,y);
+    ctx.restore();
+  }
+  function roundRect(ctx, x,y,w,h,r, fillCol, strokeCol){
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+    if (fillCol){ ctx.fillStyle = fillCol; ctx.fill(); }
+    if (strokeCol){ ctx.strokeStyle = strokeCol; ctx.lineWidth=1; ctx.stroke(); }
+    ctx.restore();
+  }
+
+  // -------- A/B compute --------
+  function gauss(x, mu, sigma){
+    const z=(x-mu)/sigma;
+    return Math.exp(-0.5*z*z);
+  }
+  function computeAB(u){
+    const total = cfg.B_len + cfg.gap + cfg.A_len;
+    const bH = cfg.B_len / total;
+    const gH = cfg.gap   / total;
+    const aH = cfg.A_len / total;
+
+    const b0=0, b1=bH;
+    const g0=b1, g1=b1+gH;
+    const a0=g1, a1=g1+aH;
+
+    const N=1000;
+    let A=0,B=0;
+    for(let i=0;i<N;i++){
+      const x=i/(N-1);
+      const w=gauss(x,u,cfg.sigma);
+      if(x>=b0 && x<=b1) B+=w;
+      if(x>=a0 && x<=a1) A+=w;
+    }
+    const s=A+B+1e-9;
+    A/=s; B/=s;
+    return {A,B,b0,b1,g0,g1,a0,a1};
+  }
+  function stateOf(d, diff){
+    if (d < cfg.blind || d > cfg.rangeMax) return "out_of_range";
+    return (Math.abs(diff) > cfg.TH) ? "object_present" : "no_object";
+  }
+
+  // -------- Interaction --------
+  let d = Number(dSlider.value);
+  let dragging = false;
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  function layoutMain(W,H){
+    // v2: spacing tuned for better composition
+    const pad = 46;
+    const pdX = pad + 90;
+
+    const pdTop = H*0.16;
+    const pdH   = H*0.68;
+
+    // lens more central, not too close to target
+    const lens = { x: pdX + 190, y: H*0.34 };
+    const ld   = { x: lens.x - 40, y: H*0.80 };
+
+    // target track further right; avoid hugging canvas edge
+    const xMin = lens.x + 120;
+    const xMax = W - 70;
+
+    return {pad,pdX,pdTop,pdH,lens,ld,xMin,xMax};
+  }
+
+  function xFromD(d, xMin,xMax){
+    return xMin + (clamp(d,0,350)/350)*(xMax-xMin);
+  }
+  function dFromX(px, xMin,xMax){
+    const u = (px - xMin)/(xMax-xMin);
+    return clamp(u,0,1)*350;
+  }
+  function isNearTarget(px, xT){
+    return Math.abs(px - xT) < 14;
+  }
+
+  main.addEventListener('mousedown', (e)=>{
+    const rect = main.getBoundingClientRect();
+    const px = (e.clientX - rect.left);
+    const W = mainBox.getBoundingClientRect().width;
+    const H = mainBox.getBoundingClientRect().height;
+    const L = layoutMain(W,H);
+    const xT = xFromD(d, L.xMin, L.xMax);
+    if (isNearTarget(px, xT)) dragging = true;
+  });
+  window.addEventListener('mouseup', ()=> dragging=false);
+  window.addEventListener('mousemove', (e)=>{
+    if(!dragging) return;
+    const rect = main.getBoundingClientRect();
+    const px = (e.clientX - rect.left);
+    const W = mainBox.getBoundingClientRect().width;
+    const H = mainBox.getBoundingClientRect().height;
+    const L = layoutMain(W,H);
+    d = dFromX(px, L.xMin, L.xMax);
+    dSlider.value = String(Math.round(d));
+    render();
+  });
+  dSlider.addEventListener('input', ()=>{ d = Number(dSlider.value); render(); });
+
+  // -------- Render main --------
+  function renderMain(){
+    const W = mainBox.getBoundingClientRect().width;
+    const H = mainBox.getBoundingClientRect().height;
+
+    g.clearRect(0,0,W,H);
+
+    // softer grid (reduced density)
+    g.save();
+    g.globalAlpha = 0.20;
+    for(let x=0;x<=W;x+=70) line(g,x,0,x,H,"rgba(148,163,184,0.20)",1);
+    for(let y=0;y<=H;y+=70) line(g,0,y,W,y,"rgba(148,163,184,0.20)",1);
+    g.restore();
+
+    const L = layoutMain(W,H);
+
+    // marker lines on same track
+    const xBlind = xFromD(cfg.blind, L.xMin, L.xMax);
+    const xRange = xFromD(cfg.rangeMax, L.xMin, L.xMax);
+
+    line(g, xBlind, 16, xBlind, H-16, "rgba(251,113,133,0.60)", 2.2);
+    text(g, "10mm", xBlind, 32, "rgba(251,113,133,0.95)", 12, "center");
+
+    line(g, xRange, 16, xRange, H-16, "rgba(245,158,11,0.60)", 2.2);
+    text(g, "300mm", xRange, 32, "rgba(245,158,11,0.95)", 12, "center");
+
+    // target plane
+    const xT = xFromD(d, L.xMin, L.xMax);
+    line(g, xT, 22, xT, H-22, "rgba(251,191,36,0.95)", 4.2);
+    circle(g, xT, H*0.50, 6.5, "rgba(251,191,36,0.95)");
+    text(g, "Target", xT, H-26, "rgba(251,191,36,0.90)", 12, "center");
+
+    // PD plane like ref (slimmer) + B/A highlight segments
+    const pdSpineW = 9;
+    line(g, L.pdX, L.pdTop, L.pdX, L.pdTop+L.pdH, "rgba(96,165,250,0.95)", pdSpineW);
+
+    // highlight: B (top large) and A (bottom small) on the spine
+    const splitY = L.pdTop + L.pdH * 0.62; // B above, A below
+    line(g, L.pdX, L.pdTop+6, L.pdX, splitY-6, "rgba(34,211,238,0.60)", pdSpineW+1);
+    line(g, L.pdX, splitY+6, L.pdX, L.pdTop+L.pdH-6, "rgba(34,211,238,0.35)", pdSpineW+1);
+
+    // split mark
+    line(g, L.pdX-12, splitY, L.pdX+12, splitY, "rgba(229,231,235,0.30)", 2.2);
+
+    text(g, "PD plane", L.pdX-10, L.pdTop-12, "rgba(147,197,253,0.92)", 12, "right");
+    text(g, "B", L.pdX-22, L.pdTop + L.pdH*0.22, "rgba(147,197,253,0.98)", 18, "right");
+    text(g, "A", L.pdX-22, L.pdTop + L.pdH*0.82, "rgba(147,197,253,0.98)", 18, "right");
+
+    // spot position u
+    const u = cfg.spotU(d);
+    const spotY = L.pdTop + u * L.pdH;
+
+    circle(g, L.pdX, spotY, 10.5, "rgba(52,211,153,0.98)");
+    text(g, "spot", L.pdX+14, spotY+5, "rgba(52,211,153,0.92)", 12, "left");
+
+    // lens & ld
+    circle(g, L.lens.x, L.lens.y, 15, "rgba(52,211,153,0.92)");
+    text(g, "Rx Lens", L.lens.x, L.lens.y-18, "rgba(52,211,153,0.92)", 12, "center");
+
+    circle(g, L.ld.x, L.ld.y, 12.5, "rgba(96,165,250,0.92)");
+    text(g, "LD", L.ld.x, L.ld.y-18, "rgba(96,165,250,0.92)", 12, "center");
+
+    // Rays last (thicker, higher contrast)
+    const targetPt = { x: xT, y: H*0.50 };
+    line(g, L.ld.x, L.ld.y, targetPt.x, targetPt.y, "rgba(96,165,250,0.98)", 3.8);
+    line(g, targetPt.x, targetPt.y, L.lens.x, L.lens.y, "rgba(52,211,153,0.98)", 3.8);
+    line(g, L.lens.x, L.lens.y, L.pdX, spotY, "rgba(96,165,250,0.98)", 3.8, [11,11]);
+
+    // guide
+    line(g, L.pdX, spotY, L.lens.x, L.lens.y, "rgba(96,165,250,0.32)", 2.4, [7,11]);
+
+    // A/B compute
+    const ab = computeAB(u);
+    const diff = ab.B - ab.A;
+
+    text(g, `A=${ab.A.toFixed(3)}  B=${ab.B.toFixed(3)}  Δ=B−A=${diff.toFixed(3)}  TH=${cfg.TH.toFixed(2)}`,
+      18, H-18, "rgba(229,231,235,0.92)", 12, "left");
+
+    return {u, ab, diff};
+  }
+
+  // -------- Render top view --------
+  function renderTop(u, ab){
+    const W = topBox.getBoundingClientRect().width;
+    const H = topBox.getBoundingClientRect().height;
+
+    t.clearRect(0,0,W,H);
+
+    // soft background
+    t.save();
+    t.fillStyle = "rgba(255,255,255,0.03)";
+    t.fillRect(0,0,W,H);
+    t.restore();
+
+    const pad = 22;
+    const x = 24, y = pad, w = 190, h = H - pad*2;
+
+    // housing
+    roundRect(t, x, y, w, h, 16, "rgba(96,165,250,0.06)", "rgba(255,255,255,0.10)");
+
+    const total = cfg.B_len + cfg.gap + cfg.A_len;
+    const bH = (cfg.B_len/total) * h;
+    const gH = (cfg.gap/total) * h;
+    const aH = (cfg.A_len/total) * h;
+
+    // B rect
+    roundRect(t, x+12, y+12, w-24, bH-18, 14, "rgba(96,165,250,0.22)", "rgba(96,165,250,0.28)");
+    text(t, "B", x+w/2, y+12+(bH-18)/2, "rgba(147,197,253,0.98)", 16, "center");
+
+    // gap center line
+    const gapY = y+12 + (bH-18) + gH*0.5;
+    line(t, x+12, gapY, x+w-12, gapY, "rgba(229,231,235,0.22)", 2.2);
+
+    // A rect
+    roundRect(t, x+12, y+12 + bH + gH, w-24, aH-18, 14, "rgba(96,165,250,0.12)", "rgba(96,165,250,0.20)");
+    text(t, "A", x+w/2, y+12+bH+gH+(aH-18)/2, "rgba(147,197,253,0.98)", 16, "center");
+
+    // spot (strictly top->bottom)
+    const spotY = y+12 + u*(h-24);
+    circle(t, x+w/2, spotY, 9.5, "rgba(52,211,153,0.98)");
+
+    // compact meters
+    const mx = x + w + 22;
+    const mw = W - mx - 24;
+    function meter(label, val, yy, col){
+      roundRect(t, mx, yy, mw, 14, 8, "rgba(255,255,255,0.05)", "rgba(255,255,255,0.05)");
+      roundRect(t, mx, yy, mw*Math.max(0,Math.min(1,val)), 14, 8, col, null);
+      text(t, `${label}: ${val.toFixed(3)}`, mx, yy-6, "rgba(229,231,235,0.84)", 12, "left");
+    }
+    meter("B", ab.B, y+70, "rgba(96,165,250,0.55)");
+    meter("A", ab.A, y+70+14+20, "rgba(96,165,250,0.35)");
+  }
+
+  function updateUI(u, ab, diff){
+    const st = stateOf(d, diff);
+    dTxt.textContent = `${Math.round(d)}`;
+    dTxt2.textContent = `${Math.round(d)}`;
+    uTxt.textContent = u.toFixed(3);
+
+    stateTxt.textContent = st;
+    stateDot.style.background =
+      (st==="object_present") ? "var(--green)" :
+      (st==="no_object") ? "var(--red)" : "var(--orange)";
+
+    readout.textContent = `A=${ab.A.toFixed(4)}  B=${ab.B.toFixed(4)}  Δ=B−A=${diff.toFixed(4)}  （远→近：spot 上→下）`;
+  }
+
+  function render(){
+    const out = renderMain();
+    renderTop(out.u, out.ab);
+    updateUI(out.u, out.ab, out.diff);
+  }
+
+  // init
+  resize();
+})();
+</script>
+</body>
+</html>
